@@ -21,3 +21,10 @@ dependencyResolutionManagement {
 
 rootProject.name = "Modular Stream Player"
 include(":app")
+include(":core-model")
+include(":core-player")
+include(":data-source")
+include(":data-local")
+include(":feature-browser")
+include(":data-repository")
+include(":theme")

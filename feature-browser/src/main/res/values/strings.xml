@@ -1,0 +1,5 @@
+<resources>
+    <!-- Navigation Argument Keys -->
+    <string name="nav_arg_path">path</string>
+    <string name="nav_arg_track_item">trackItem</string>
+</resources>

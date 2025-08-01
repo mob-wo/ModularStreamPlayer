@@ -2,7 +2,20 @@
 <manifest xmlns:android="http://schemas.android.com/apk/res/android"
     xmlns:tools="http://schemas.android.com/tools">
 
+    <!-- ローカルストレージの音楽ファイルへのアクセス権限 -->
+    <!-- Android 13 (API 33) 以上 -->
+    <uses-permission android:name="android.permission.READ_MEDIA_AUDIO" />
+    <!-- Android 12L (API 32) 以下 -->
+    <uses-permission android:name="android.permission.READ_EXTERNAL_STORAGE"
+        android:maxSdkVersion="32" />
+
+    <!-- Foreground Service を実行するための権限 (API 28以上で必要) -->
+    <uses-permission android:name="android.permission.FOREGROUND_SERVICE" />
+    <!-- Android 14 (API 34) 以上で Foreground Service のタイプを指定する場合に必要 -->
+    <uses-permission android:name="android.permission.FOREGROUND_SERVICE_MEDIA_PLAYBACK" />
+
     <application
+        android:name=".MainApplication"
         android:allowBackup="true"
         android:dataExtractionRules="@xml/data_extraction_rules"
         android:fullBackupContent="@xml/backup_rules"
@@ -22,6 +35,19 @@
                 <category android:name="android.intent.category.LAUNCHER" />
             </intent-filter>
         </activity>
+
+        <!-- PlaybackService の宣言 -->
+        <!-- 技術設計書 (4.1) に基づき、MediaLibraryService を想定 -->
+        <service
+            android:name="com.example.core_player.PlaybackService"
+        android:exported="true"
+        android:foregroundServiceType="mediaPlayback">
+        <intent-filter>
+            <action android:name="androidx.media3.session.MediaLibraryService"/>
+            <action android:name="android.media.browse.MediaBrowserService"/>
+        </intent-filter>
+        </service>
+
     </application>
 
 </manifest>
