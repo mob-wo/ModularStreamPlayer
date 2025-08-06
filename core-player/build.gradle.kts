@@ -1,6 +1,12 @@
 plugins {
     alias(libs.plugins.android.library)
     alias(libs.plugins.kotlin.android)
+
+    // kpsプラグイン
+    alias(libs.plugins.ksp)
+    // Hiltプラグイン
+    alias(libs.plugins.hilt.android)
+
 }
 
 android {
@@ -38,6 +44,10 @@ dependencies {
     implementation(libs.androidx.appcompat)
     implementation(libs.material)
 
+    // Hilt
+    implementation(libs.hilt.android)
+    ksp(libs.hilt.compiler)
+
     //Jetpack Media3
     implementation(libs.androidx.media3.exoplayer)
     implementation(libs.androidx.media3.session)
@@ -45,6 +55,7 @@ dependencies {
 
     //module
     implementation(project(":core-model"))
+    implementation(project(":data-repository"))
 
     testImplementation(libs.junit)
     androidTestImplementation(libs.androidx.junit)

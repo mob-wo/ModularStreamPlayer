@@ -2,4 +2,10 @@
     <!-- Navigation Argument Keys -->
     <string name="nav_arg_path">path</string>
     <string name="nav_arg_track_item">trackItem</string>
+    <!-- Screen Titles -->
+    <string name="screen_title_browser">File Browser</string>
+    <string name="screen_title_player">Now Playing</string>
+    <string name="screen_title_settings">Settings</string>
+    <!-- Navigation Actions -->
+    <string name="back_button">Back</string>
 </resources>

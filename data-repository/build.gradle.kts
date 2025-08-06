@@ -43,6 +43,12 @@ dependencies {
     implementation(libs.androidx.appcompat)
     implementation(libs.material)
 
+    // Jetpack DataStore (Preferences)
+    implementation(libs.androidx.datastore.preferences)
+
+    // mp3agic (MP3 メタデータライブラリ)
+    implementation(libs.mp3agic)
+
     // Hilt
     implementation(libs.hilt.android)
     ksp(libs.hilt.compiler)

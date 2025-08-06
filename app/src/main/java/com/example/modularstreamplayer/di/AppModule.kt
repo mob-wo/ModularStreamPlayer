@@ -1,5 +1,5 @@
 package com.example.modularstreamplayer.di
-
+/*
 import android.content.Context
 import androidx.media3.common.Player
 import androidx.media3.exoplayer.ExoPlayer
@@ -37,3 +37,5 @@ object AppModule {
 
     // ViewModelに注入するPlayerインスタンスを@ViewModelScopedで提供する場合などもここに記述できる
 }
+
+ */
