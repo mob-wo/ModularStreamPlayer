@@ -1,21 +1,41 @@
-package com.example.feature_browser
+package com.example.feature_browser.player
 
-import androidx.compose.foundation.layout.*
+import androidx.compose.foundation.layout.Arrangement
+import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.PaddingValues
+import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.layout.Spacer
+import androidx.compose.foundation.layout.aspectRatio
+import androidx.compose.foundation.layout.fillMaxSize
+import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.size
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material.icons.filled.Pause
 import androidx.compose.material.icons.filled.PlayArrow
 import androidx.compose.material.icons.filled.SkipNext
 import androidx.compose.material.icons.filled.SkipPrevious
-import androidx.compose.material3.*
+import androidx.compose.material3.Card
+import androidx.compose.material3.CardDefaults
+import androidx.compose.material3.CircularProgressIndicator
+import androidx.compose.material3.ExperimentalMaterial3Api
+import androidx.compose.material3.Icon
+import androidx.compose.material3.IconButton
+import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.Scaffold
+import androidx.compose.material3.Text
+import androidx.compose.material3.TopAppBar
+import androidx.compose.material3.TopAppBarDefaults
 import androidx.compose.runtime.Composable
-import androidx.compose.runtime.LaunchedEffect
-import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.layout.ContentScale
-import androidx.compose.ui.res.painterResource
+import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.Dp
@@ -23,15 +43,15 @@ import androidx.compose.ui.unit.dp
 import androidx.hilt.navigation.compose.hiltViewModel
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import coil.compose.AsyncImage
-import com.example.core_model.TrackItem
+import coil.request.ImageRequest
 import com.example.data_repository.ViewMode
+import com.example.feature_browser.R
 import com.example.theme.AppTheme
-import java.util.concurrent.TimeUnit
 
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
-fun PlayerScreen(
+fun PlayerFullScreen(
     modifier: Modifier = Modifier,
     onNavigateUp: () -> Unit,
 ) {
@@ -43,7 +63,7 @@ fun PlayerScreen(
                     IconButton(onClick = onNavigateUp) {
                         Icon(
                             imageVector = Icons.AutoMirrored.Filled.ArrowBack,
-                            contentDescription = "Back"
+                            contentDescription = stringResource(R.string.back)
                         )
                     }
                 },
@@ -56,8 +76,48 @@ fun PlayerScreen(
 //    LaunchedEffect(uiState.currentTrack) {
 //        viewModel.setTrack(uiState.currentTrack)
 //    }
+        PlayerScreen(
+            modifier = modifier,
+            paddingValues = paddingValues,
+        )
+    }
+}
+
+@OptIn(ExperimentalMaterial3Api::class)
+@Composable
+fun PlayerScreen(
+    modifier: Modifier = Modifier,
+    viewMode: ViewMode = ViewMode.SINGLE,
+    paddingValues: PaddingValues = PaddingValues(),
+    viewModel: PlayerViewModel = hiltViewModel()
+) {
+    val uiState by viewModel.uiState.collectAsStateWithLifecycle()
+    val isControllerReady by viewModel.isControllerReady.collectAsStateWithLifecycle()
+    if (!isControllerReady) {
+        Box(
+            modifier = modifier.fillMaxSize(),
+            contentAlignment = Alignment.Center
+        ) {
+            // ローディング中の表示
+            CircularProgressIndicator()
+        }
+    } else {
         PlayerScreenContent(
             modifier = modifier,
+            viewMode = viewMode,
+            uiState = uiState,
+            onSeek = { newPosition ->
+                viewModel.onSeek(newPosition)
+            },
+            onPreviousClick = {
+                viewModel.onPreviousClick()
+            },
+            onPlayPauseClick = {
+                viewModel.onPlayPauseClick()
+            },
+            onNextClick = {
+                viewModel.onNextClick()
+            },
             paddingValues = paddingValues,
         )
     }
@@ -68,13 +128,13 @@ fun PlayerScreen(
 fun PlayerScreenContent(
     modifier: Modifier = Modifier,
     viewMode: ViewMode = ViewMode.SINGLE,
+    uiState: PlayerUiState = PlayerUiState(),
     paddingValues: PaddingValues = PaddingValues(),
-    viewModel: PlayerViewModel = hiltViewModel()
+    onSeek: (Float) -> Unit = {},
+    onPreviousClick: () -> Unit = {},
+    onPlayPauseClick: () -> Unit = {},
+    onNextClick: () -> Unit = {},
 ) {
-    // ViewModelからUI状態を収集
-    val uiState by viewModel.uiState.collectAsStateWithLifecycle()
-
-
     // 表示モードに応じてレイアウトを調整
     val artworkModifier: Modifier
     val mainContentSpacerHeight: Dp
@@ -82,21 +142,21 @@ fun PlayerScreenContent(
 
     if (viewMode == ViewMode.DUAL) {
         artworkModifier = Modifier
-            .fillMaxWidth(0.6f) // コンパクトモードでは横幅を少し狭く
+            .fillMaxWidth(0.3f) // コンパクトモードでは横幅を少し狭く
             .aspectRatio(1f)
-        mainContentSpacerHeight = 16.dp // コンパクトモードではメインコンテンツとアートワークの間を狭く
-        controlsSpacerWeight = 0.5f     // コンパクトモードでは下のスペーサーを小さく
+        mainContentSpacerHeight = 8.dp // コンパクトモードではメインコンテンツとアートワークの間を狭く
+        controlsSpacerWeight = 0.0f     // コンパクトモードでは下のスペーサーを小さく
     } else { // FULL モード
-        artworkModifier = Modifier
+        artworkModifier = modifier
             .fillMaxWidth()
             .aspectRatio(1f)
         mainContentSpacerHeight = 48.dp
-        controlsSpacerWeight = 1.5f
+        controlsSpacerWeight = 1.0f
     }
 
     Column(
-        modifier = Modifier
-            .fillMaxSize()
+        modifier = modifier
+            //.fillMaxSize()
             .padding(paddingValues)
             .padding(horizontal = 24.dp),
         horizontalAlignment = Alignment.CenterHorizontally,
@@ -104,8 +164,11 @@ fun PlayerScreenContent(
     ) {
         // Spacer to push content down
         if (viewMode == ViewMode.SINGLE) {
-            Spacer(modifier = Modifier.weight(1f))
+            Spacer(modifier = Modifier.weight(controlsSpacerWeight))
+        } else {
+            Spacer(modifier = Modifier.height(mainContentSpacerHeight))
         }
+
 
         // Album Art
         Card(
@@ -113,11 +176,13 @@ fun PlayerScreenContent(
             elevation = CardDefaults.cardElevation(defaultElevation = 8.dp)
         ) {
             AsyncImage(
-                model = uiState.artworkUri,
+                model = ImageRequest.Builder(LocalContext.current)
+                    .data(uiState.artworkData) // ★★★ UriではなくByteArrayを直接渡す ★★★
+                    .crossfade(true)
+                    .placeholder(R.drawable.ic_default_music_art)
+                    .error(R.drawable.ic_default_music_art)
+                    .build(),
                 contentDescription = "Album Art",
-                // フェーズ1ではローカルのリソースを指定
-                placeholder = painterResource(id = R.drawable.ic_default_music_art),
-                error = painterResource(id = R.drawable.ic_default_music_art),
                 contentScale = ContentScale.Crop,
                 modifier = Modifier.fillMaxSize()
             )
@@ -140,29 +205,17 @@ fun PlayerScreenContent(
             overflow = TextOverflow.Ellipsis
         )
 
-        Spacer(modifier = Modifier.height(16.dp))
+        Spacer(modifier = Modifier.height(mainContentSpacerHeight))
 
         // Seek Bar
-        Column(modifier = Modifier.fillMaxWidth()) {
-            Slider(
-                value = uiState.progress,
-                onValueChange = { viewModel.onSeek(it) },
-                valueRange = 0f..uiState.totalDuration.toFloat().coerceAtLeast(0f)
-            )
-            Row(
-                modifier = Modifier.fillMaxWidth(),
-                horizontalArrangement = Arrangement.SpaceBetween
-            ) {
-                Text(
-                    text = formatDuration(uiState.currentPosition),
-                    style = MaterialTheme.typography.labelSmall
-                )
-                Text(
-                    text = formatDuration(uiState.totalDuration),
-                    style = MaterialTheme.typography.labelSmall
-                )
+        PlayerSeekBar(
+            progress = uiState.progress,
+            currentPositionFormatted = uiState.currentPositionFormatted,
+            totalDurationFormatted = uiState.totalDurationFormatted,
+            onSeek = { newPosition ->
+                onSeek(newPosition)
             }
-        }
+        )
 
         Spacer(modifier = Modifier.height(8.dp))
 
@@ -173,7 +226,10 @@ fun PlayerScreenContent(
             verticalAlignment = Alignment.CenterVertically
         ) {
             // Previous Button (フェーズ4で有効化)
-            IconButton(onClick = { /* TODO */ }, enabled = false) {
+            IconButton(
+                onClick = { onPreviousClick() },
+                enabled = uiState.hasPreviousMediaItem
+            ) {
                 Icon(
                     imageVector = Icons.Default.SkipPrevious,
                     contentDescription = "Previous",
@@ -182,7 +238,10 @@ fun PlayerScreenContent(
             }
 
             // Play/Pause Button
-            IconButton(onClick = { viewModel.onPlayPauseClick() }, modifier = Modifier.size(72.dp)) {
+            IconButton(
+                onClick = { onPlayPauseClick() },
+                modifier = Modifier.size(72.dp)
+            ) {
                 Icon(
                     imageVector = if (uiState.isPlaying) Icons.Default.Pause else Icons.Default.PlayArrow,
                     contentDescription = if (uiState.isPlaying) "Pause" else "Play",
@@ -191,7 +250,10 @@ fun PlayerScreenContent(
             }
 
             // Next Button (フェーズ4で有効化)
-            IconButton(onClick = { /* TODO */ }, enabled = false) {
+            IconButton(
+                onClick = { onNextClick() },
+                enabled = uiState.hasNextMediaItem
+            ) {
                 Icon(
                     imageVector = Icons.Default.SkipNext,
                     contentDescription = "Next",
@@ -199,24 +261,33 @@ fun PlayerScreenContent(
                 )
             }
         }
-
-        // Spacer to push content up
-        Spacer(modifier = Modifier.weight(controlsSpacerWeight))
+        if (viewMode == ViewMode.SINGLE) {
+            Spacer(modifier = Modifier.weight(controlsSpacerWeight))
+        } else {
+            Spacer(modifier = Modifier.height(mainContentSpacerHeight))
+        }
     }
 }
 
-
-private fun formatDuration(millis: Long): String {
-    val minutes = TimeUnit.MILLISECONDS.toMinutes(millis)
-    val seconds = TimeUnit.MILLISECONDS.toSeconds(millis) - TimeUnit.MINUTES.toSeconds(minutes)
-    return String.format("%02d:%02d", minutes, seconds)
-}
+val previewItem = PlayerUiState(
+    trackName = "Another Brick in the Wall, Pt. 2",
+    artistName = "Pink Floyd",
+    artworkData = null,
+    currentPositionFormatted = "00:00",
+    totalDurationFormatted = "00:00",
+    progress = 0f,
+    isPlaying = false,
+    hasPreviousMediaItem = false,
+    hasNextMediaItem = false
+)
 
 @Preview(showBackground = true, name = "PlayerScreenContent - Compact")
 @Composable
 fun PlayerScreenContentCompactPreview() {
     AppTheme {
-        PlayerScreenContent(viewMode = ViewMode.DUAL)
+        PlayerScreenContent(
+            viewMode = ViewMode.DUAL,
+            uiState = previewItem)
     }
 }
 
@@ -224,26 +295,8 @@ fun PlayerScreenContentCompactPreview() {
 @Composable
 fun PlayerScreenContentFullPreview() {
     AppTheme {
-        PlayerScreenContent(viewMode = ViewMode.SINGLE)
+        PlayerScreenContent(
+            viewMode = ViewMode.SINGLE,
+            uiState = previewItem)
     }
 }
-//@Preview(showBackground = true)
-//@Composable
-//fun PlayerScreenPreview() {
-//    val previewTrack = TrackItem(
-//        title = "Another Brick in the Wall, Pt. 2",
-//        path = "",
-//        uri = "",
-//        artist = "Pink Floyd",
-//        albumId = null,
-//        album = "The Wall",
-//        artworkUri = null,
-//        durationMs = 239000 // 3:59
-//    )
-//
-//    AppTheme {
-//        PlayerScreenContent(
-//
-//        )
-//    }
-//}
