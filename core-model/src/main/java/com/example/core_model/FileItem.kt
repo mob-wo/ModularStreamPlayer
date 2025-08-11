@@ -4,7 +4,7 @@ import android.os.Parcelable
 import kotlinx.parcelize.Parcelize
 
 // MediaItem.kt
-sealed interface MediaItem {
+sealed interface FileItem {
     val title: String
     val path: String
     val uri: String // 再生や識別に使うURI形式のID
@@ -15,7 +15,7 @@ data class FolderItem(
     override val title: String,
     override val path: String,
     override val uri: String
-) : MediaItem, Parcelable
+) : FileItem, Parcelable
 
 @Parcelize
 data class TrackItem(
@@ -27,4 +27,4 @@ data class TrackItem(
     val album: String?,
     val artworkUri: String?, // Coilで読み込む用のアートワークURI
     val durationMs: Long
-) : MediaItem, Parcelable
+) : FileItem, Parcelable
