@@ -1,4 +1,4 @@
-package com.example.feature_browser
+package com.example.feature_browser.browser
 
 import android.Manifest
 import android.os.Build
@@ -17,7 +17,7 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.dp
 import com.example.core_model.FolderItem
-import com.example.core_model.MediaItem
+import com.example.core_model.FileItem
 import com.example.core_model.TrackItem
 import com.example.data_repository.LayoutMode
 import com.example.theme.AppTheme
@@ -25,18 +25,15 @@ import com.google.accompanist.permissions.ExperimentalPermissionsApi
 import com.google.accompanist.permissions.isGranted
 import com.google.accompanist.permissions.rememberPermissionState
 
-@OptIn(ExperimentalPermissionsApi::class, ExperimentalMaterial3Api::class)
+@OptIn(ExperimentalPermissionsApi::class)
 @Composable
 fun BrowserScreen(
     modifier: Modifier = Modifier,
     uiState: BrowserUiState,
     loadItems: () -> Unit,
-    onItemClick: (MediaItem) -> Unit,
-    onItemLongClick: (MediaItem) -> Unit,
-
-) {
-
-
+    onItemClick: (FileItem) -> Unit,
+    onItemLongClick: (FileItem) -> Unit,
+    ) {
     // Android 13以上はREAD_MEDIA_AUDIO、それ未満はREAD_EXTERNAL_STORAGE
     val permission = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
         Manifest.permission.READ_MEDIA_AUDIO
@@ -45,11 +42,6 @@ fun BrowserScreen(
     }
     val permissionState = rememberPermissionState(permission)
 
-//    LaunchedEffect(Unit) {
-//        if (!permissionState.status.isGranted) {
-//            permissionState.launchPermissionRequest()
-//        }
-//    }
     LaunchedEffect(uiState.isPathInitialized, uiState.currentPath, permissionState.status) {
         if (uiState.isPathInitialized && permissionState.status.isGranted) {
             Log.d("BrowserScreen", "LaunchedEffect triggered: Path initialized and permission granted. Path: ${uiState.currentPath}")
@@ -61,31 +53,19 @@ fun BrowserScreen(
             // viewModel.clearItemsOrSetPermissionError()
         }
     }
-    Box(
-        modifier = modifier.fillMaxSize(),
-        contentAlignment = Alignment.Center
-    ) {
-        if (permissionState.status.isGranted) {
-            if (uiState.isLoading) {
-                // ローディング中の表示
-                CircularProgressIndicator()
-            } else if (uiState.items.isEmpty()) {
-                // アイテムが一つもない場合の表示
-                Text(
-                    text = "このフォルダは空です",
-                    style = MaterialTheme.typography.bodyLarge,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant
-                )
-            } else {
-                // レイアウトモードに応じてリストまたはグリッドを表示
-                MediaList(
-                    mediaItems = uiState.items,
-                    layoutMode = uiState.drawerState.layoutMode,
-                    onItemClick = onItemClick,
-                    onItemLongClick = onItemLongClick
-                )
-            }
-        } else {
+
+    if (permissionState.status.isGranted){
+        BrowserScreenContent(
+            modifier = modifier,
+            uiState = uiState,
+            onItemClick = onItemClick,
+            onItemLongClick = onItemLongClick
+        )
+    } else {
+        Box(
+            modifier = modifier.fillMaxSize(),
+            contentAlignment = Alignment.Center
+        ) {
             Text(
                 text = "ストレージへのアクセス権限が必要です",
                 style = MaterialTheme.typography.bodyLarge,
@@ -95,13 +75,48 @@ fun BrowserScreen(
     }
 }
 
+@Composable
+fun BrowserScreenContent(
+    modifier: Modifier = Modifier,
+    uiState: BrowserUiState,
+    onItemClick: (FileItem) -> Unit,
+    onItemLongClick: (FileItem) -> Unit,
+
+    ) {
+    Box(
+        modifier = modifier.fillMaxSize(),
+        contentAlignment = Alignment.Center
+    ) {
+
+        if (uiState.isLoading) {
+            // ローディング中の表示
+            CircularProgressIndicator()
+        } else if (uiState.items.isEmpty()) {
+            // アイテムが一つもない場合の表示
+            Text(
+                text = "このフォルダは空です",
+                style = MaterialTheme.typography.bodyLarge,
+                color = MaterialTheme.colorScheme.onSurfaceVariant
+            )
+        } else {
+            // レイアウトモードに応じてリストまたはグリッドを表示
+            MediaList(
+                fileItems = uiState.items,
+                layoutMode = uiState.drawerState.layoutMode,
+                onItemClick = onItemClick,
+                onItemLongClick = onItemLongClick
+            )
+        }
+    }
+}
+
 
 @Composable
 private fun MediaList(
-    mediaItems: List<MediaItem>,
+    fileItems: List<FileItem>,
     layoutMode: LayoutMode,
-    onItemClick: (MediaItem) -> Unit,
-    onItemLongClick: (MediaItem) -> Unit,
+    onItemClick: (FileItem) -> Unit,
+    onItemLongClick: (FileItem) -> Unit,
     modifier: Modifier = Modifier
 ) {
     if (layoutMode == LayoutMode.LIST) {
@@ -110,10 +125,10 @@ private fun MediaList(
             contentPadding = PaddingValues(vertical = 8.dp)
         ) {
             items(
-                items = mediaItems,
+                items = fileItems,
                 key = { it.uri } // パフォーマンス向上のため一意なキーを指定
             ) { item ->
-                MediaListItem(
+                _root_ide_package_.com.example.feature_browser.MediaListItem(
                     item = item,
                     layoutMode = LayoutMode.LIST,
                     onClick = onItemClick,
@@ -131,10 +146,10 @@ private fun MediaList(
             verticalArrangement = Arrangement.spacedBy(4.dp)
         ) {
             items(
-                items = mediaItems,
+                items = fileItems,
                 key = { it.uri } // パフォーマンス向上のため一意なキーを指定
             ) { item ->
-                MediaListItem(
+                _root_ide_package_.com.example.feature_browser.MediaListItem(
                     item = item,
                     layoutMode = layoutMode,
                     onClick = onItemClick,
@@ -150,7 +165,7 @@ private fun MediaList(
 
 // --- Preview ---
 
-val previewItems: List<MediaItem> = listOf(
+val previewItems: List<FileItem> = listOf(
     FolderItem("Rock Classics", "/Music/Rock", "uri_folder_1"),
     TrackItem("Bohemian Rhapsody", "/Music/Queen/song1.mp3", "uri_track_1", "Queen", null,"A Night at the Opera", null, 482000),
     TrackItem("Stairway to Heaven", "/Music/LedZep/song2.mp3", "uri_track_2", "Led Zeppelin", null,"Led Zeppelin IV", null, 482000),
@@ -161,14 +176,13 @@ val previewItems: List<MediaItem> = listOf(
 @Composable
 fun BrowserScreenListPreview() {
     AppTheme {
-        BrowserScreen(
+        BrowserScreenContent(
             uiState = BrowserUiState(
                 currentPath = "/Music",
                 items = previewItems,
                 isLoading = false,
-                drawerState = DrawerUiState()
+                drawerState = _root_ide_package_.com.example.feature_browser.DrawerUiState()
             ),
-            loadItems = { } ,
             onItemClick = { },
             onItemLongClick = { }
         )
@@ -179,14 +193,15 @@ fun BrowserScreenListPreview() {
 @Composable
 fun BrowserScreenGridMediumPreview() {
     AppTheme {
-        BrowserScreen(
+        BrowserScreenContent(
             uiState = BrowserUiState(
                 currentPath = "/Music",
                 items = previewItems,
                 isLoading = false,
-                drawerState = DrawerUiState(layoutMode = LayoutMode.GRID_MEDIUM)
+                drawerState = _root_ide_package_.com.example.feature_browser.DrawerUiState(
+                    layoutMode = LayoutMode.GRID_MEDIUM
+                )
             ),
-            loadItems = { },
             onItemClick = { },
             onItemLongClick = { }
         )
@@ -197,14 +212,15 @@ fun BrowserScreenGridMediumPreview() {
 @Composable
 fun BrowserScreenLoadingPreview() {
     AppTheme {
-        BrowserScreen(
+        BrowserScreenContent(
             uiState = BrowserUiState(
                 currentPath = "/Music",
                 items = previewItems,
                 isLoading = false,
-                drawerState = DrawerUiState(layoutMode = LayoutMode.GRID_MEDIUM)
+                drawerState = _root_ide_package_.com.example.feature_browser.DrawerUiState(
+                    layoutMode = LayoutMode.GRID_MEDIUM
+                )
             ),
-            loadItems = { },
             onItemClick = { },
             onItemLongClick = { }
         )
@@ -215,14 +231,15 @@ fun BrowserScreenLoadingPreview() {
 @Composable
 fun BrowserScreenEmptyPreview() {
     AppTheme {
-        BrowserScreen(
+        BrowserScreenContent(
             uiState = BrowserUiState(
                 currentPath = "/Music",
                 items = previewItems,
                 isLoading = false,
-                drawerState = DrawerUiState(layoutMode = LayoutMode.GRID_MEDIUM)
+                drawerState = _root_ide_package_.com.example.feature_browser.DrawerUiState(
+                    layoutMode = LayoutMode.GRID_MEDIUM
+                )
             ),
-            loadItems = { },
             onItemClick = { },
             onItemLongClick = { }
         )
