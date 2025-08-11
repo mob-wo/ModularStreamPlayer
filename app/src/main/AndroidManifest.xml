@@ -40,12 +40,12 @@
         <!-- 技術設計書 (4.1) に基づき、MediaLibraryService を想定 -->
         <service
             android:name="com.example.core_player.PlaybackService"
-        android:exported="true"
-        android:foregroundServiceType="mediaPlayback">
-        <intent-filter>
-            <action android:name="androidx.media3.session.MediaLibraryService"/>
-            <action android:name="android.media.browse.MediaBrowserService"/>
-        </intent-filter>
+            android:exported="true"
+            android:foregroundServiceType="mediaPlayback">
+            <intent-filter>
+                <action android:name="androidx.media3.session.MediaSessionService"/>
+                <action android:name="android.media.browse.MediaBrowserService"/>
+            </intent-filter>
         </service>
 
     </application>
