@@ -1,4 +1,4 @@
-package com.example.modularstreamplayer.navigation
+package com.example.feature_browser.navigation
 
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Modifier
@@ -6,9 +6,9 @@ import androidx.navigation.NavHostController
 import androidx.navigation.compose.NavHost
 import androidx.navigation.compose.composable
 import com.example.feature_browser.MainScreen
-import com.example.feature_browser.PlayerScreen
 import com.example.feature_browser.SettingsScreen
 import com.example.feature_browser.ScreenTitle
+import com.example.feature_browser.player.PlayerFullScreen
 
 
 /**
@@ -41,7 +41,7 @@ fun AppNavHost(
          * MainScreenから遷移してくる。
          */
         composable(route = ScreenTitle.Player.name) {
-            PlayerScreen(
+            PlayerFullScreen(
                 onNavigateUp = { navController.navigateUp() }
             )
         }
