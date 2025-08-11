@@ -57,6 +57,8 @@ dependencies {
     implementation(libs.androidx.ui.tooling.preview)
     implementation(libs.androidx.material3)
 
+    implementation(libs.kotlinx.coroutines.guava)
+
     // Hilt
     implementation(libs.hilt.android)
     ksp(libs.hilt.compiler)
@@ -77,6 +79,7 @@ dependencies {
 
     //module
     implementation(project(":core-model"))
+    implementation(project(":core-player"))
     implementation(project(":data-repository"))
     implementation(project(":theme"))
 
