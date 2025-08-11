@@ -2,7 +2,6 @@ package com.example.feature_browser
 
 import androidx.compose.foundation.ExperimentalFoundationApi
 import androidx.compose.foundation.combinedClickable
-import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
@@ -15,7 +14,6 @@ import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Folder
-import androidx.compose.material.icons.filled.MusicNote
 import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
 import androidx.compose.material3.Icon
@@ -35,7 +33,7 @@ import coil.compose.AsyncImage
 import coil.request.ImageRequest
 import com.example.data_repository.LayoutMode
 import com.example.core_model.FolderItem
-import com.example.core_model.MediaItem
+import com.example.core_model.FileItem
 import com.example.core_model.TrackItem
 
 /**
@@ -50,10 +48,10 @@ import com.example.core_model.TrackItem
 @OptIn(ExperimentalFoundationApi::class)
 @Composable
 fun MediaListItem(
-    item: MediaItem,
+    item: FileItem,
     layoutMode: LayoutMode,
-    onClick: (MediaItem) -> Unit,
-    onLongClick: (MediaItem) -> Unit,
+    onClick: (FileItem) -> Unit,
+    onLongClick: (FileItem) -> Unit,
     modifier: Modifier = Modifier
 ) {
     val itemModifier = modifier.combinedClickable(
@@ -79,7 +77,7 @@ fun MediaListItem(
  * 表示密度: 大（リスト形式）
  */
 @Composable
-private fun MediaListItemLarge(item: MediaItem, modifier: Modifier = Modifier) {
+private fun MediaListItemLarge(item: FileItem, modifier: Modifier = Modifier) {
     Row(
         modifier = modifier
             .fillMaxWidth()
@@ -116,7 +114,7 @@ private fun MediaListItemLarge(item: MediaItem, modifier: Modifier = Modifier) {
  * 表示密度: 中（2列グリッド形式）
  */
 @Composable
-private fun MediaListItemMedium(item: MediaItem, modifier: Modifier = Modifier) {
+private fun MediaListItemMedium(item: FileItem, modifier: Modifier = Modifier) {
     Card(
         modifier = modifier.padding(4.dp),
         elevation = CardDefaults.cardElevation(defaultElevation = 2.dp)
@@ -144,7 +142,7 @@ private fun MediaListItemMedium(item: MediaItem, modifier: Modifier = Modifier) 
  * 表示密度: 小（3列グリッド形式）
  */
 @Composable
-private fun MediaListItemSmall(item: MediaItem, modifier: Modifier = Modifier) {
+private fun MediaListItemSmall(item: FileItem, modifier: Modifier = Modifier) {
     Card(
         modifier = modifier
             .padding(2.dp)

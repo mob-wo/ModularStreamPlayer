@@ -1,10 +1,11 @@
-package com.example.core_player
+package com.example.core_player.mapper
 
 import android.net.Uri
 import androidx.core.os.bundleOf
 import com.example.core_model.TrackItem
 import androidx.media3.common.MediaItem
 import androidx.media3.common.MediaMetadata
+
 
 /**
  * Media3のMediaItemを、アプリのドメインモデルであるTrackItemに変換する拡張関数。
