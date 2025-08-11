@@ -7,5 +7,5 @@
     <string name="screen_title_player">Now Playing</string>
     <string name="screen_title_settings">Settings</string>
     <!-- Navigation Actions -->
-    <string name="back_button">Back</string>
+    <string name="back">Back</string>
 </resources>

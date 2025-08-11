@@ -6,7 +6,7 @@ import android.content.Context
 import android.net.Uri
 import android.provider.MediaStore
 import com.example.core_model.FolderItem
-import com.example.core_model.MediaItem
+import com.example.core_model.FileItem
 import com.example.core_model.TrackItem
 import com.example.data_source.MediaSource
 import dagger.hilt.android.qualifiers.ApplicationContext
@@ -23,10 +23,10 @@ class LocalMediaSource @Inject constructor(
 
     //private val rootPath = "/storage/emulated/0"
     private val rootPath = "/storage/emulated/0/Music"
-    override suspend fun getItemsIn(folderPath: String?): List<MediaItem> = withContext(Dispatchers.IO) {
+    override suspend fun getItemsIn(folderPath: String?): List<FileItem> = withContext(Dispatchers.IO) {
         val currentPath = folderPath ?: rootPath
         val parentPath = File(currentPath).parent
-        val items = mutableListOf<MediaItem>()
+        val items = mutableListOf<FileItem>()
 
         // 1. 親フォルダへのナビゲーションを追加
         if (currentPath != rootPath && parentPath != null) {
