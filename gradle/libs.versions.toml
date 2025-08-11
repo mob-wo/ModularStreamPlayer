@@ -9,6 +9,7 @@ coreKtx = "1.10.1"
 junit = "4.13.2"
 junitVersion = "1.1.5"
 espressoCore = "3.5.1"
+kotlinxCoroutinesGuava = "1.10.2"
 lifecycleRuntimeKtx = "2.6.1"
 activityCompose = "1.8.0"
 composeBom = "2024.09.00"
@@ -16,7 +17,7 @@ ksp = "2.0.21-1.0.27"
 hilt = "2.57"
 appcompat = "1.6.1"
 material = "1.10.0"
-media3Exoplayer = "1.7.1"
+media3Exoplayer = "1.8.0"
 mp3agic = "0.9.1"
 
 
@@ -49,6 +50,7 @@ androidx-compose-material-icons-extended = { group = "androidx.compose.material"
 hilt-android = { group = "com.google.dagger", name = "hilt-android", version.ref = "hilt" }
 hilt-compiler = { group = "com.google.dagger", name = "hilt-compiler", version.ref = "hilt" }
 androidx-appcompat = { group = "androidx.appcompat", name = "appcompat", version.ref = "appcompat" }
+kotlinx-coroutines-guava = { module = "org.jetbrains.kotlinx:kotlinx-coroutines-guava", version.ref = "kotlinxCoroutinesGuava" }
 material = { group = "com.google.android.material", name = "material", version.ref = "material" }
 mp3agic = { module = "com.mpatric:mp3agic", version.ref = "mp3agic" }
 
