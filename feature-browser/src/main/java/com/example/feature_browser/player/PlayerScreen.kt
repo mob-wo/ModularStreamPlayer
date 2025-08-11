@@ -113,7 +113,7 @@ fun PlayerScreenContent(
             elevation = CardDefaults.cardElevation(defaultElevation = 8.dp)
         ) {
             AsyncImage(
-                model = uiState.currentTrack?.artworkUri,
+                model = uiState.artworkUri,
                 contentDescription = "Album Art",
                 // フェーズ1ではローカルのリソースを指定
                 placeholder = painterResource(id = R.drawable.ic_default_music_art),
@@ -127,13 +127,13 @@ fun PlayerScreenContent(
 
         // Track Info
         Text(
-            text = uiState.currentTrack?.title ?: "Unknown Track",
+            text = uiState.trackName,
             style = MaterialTheme.typography.headlineSmall,
             maxLines = 1,
             overflow = TextOverflow.Ellipsis
         )
         Text(
-            text = uiState.currentTrack?.artist ?: "Unknown Artist",
+            text = uiState.artistName,
             style = MaterialTheme.typography.bodyLarge,
             color = MaterialTheme.colorScheme.onSurfaceVariant,
             maxLines = 1,
@@ -145,8 +145,8 @@ fun PlayerScreenContent(
         // Seek Bar
         Column(modifier = Modifier.fillMaxWidth()) {
             Slider(
-                value = uiState.currentPosition.toFloat(),
-                onValueChange = { viewModel.seekTo(it.toLong()) },
+                value = uiState.progress,
+                onValueChange = { viewModel.onSeek(it) },
                 valueRange = 0f..uiState.totalDuration.toFloat().coerceAtLeast(0f)
             )
             Row(
@@ -182,7 +182,7 @@ fun PlayerScreenContent(
             }
 
             // Play/Pause Button
-            IconButton(onClick = { viewModel.togglePlayPause() }, modifier = Modifier.size(72.dp)) {
+            IconButton(onClick = { viewModel.onPlayPauseClick() }, modifier = Modifier.size(72.dp)) {
                 Icon(
                     imageVector = if (uiState.isPlaying) Icons.Default.Pause else Icons.Default.PlayArrow,
                     contentDescription = if (uiState.isPlaying) "Pause" else "Play",

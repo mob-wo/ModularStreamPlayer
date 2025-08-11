@@ -1,4 +1,4 @@
-package com.example.feature_browser
+package com.example.feature_browser.browser
 
 import android.util.Log
 import androidx.lifecycle.ViewModel
@@ -8,10 +8,13 @@ import com.example.core_model.TrackItem
 import com.example.core_model.MediaItem
 import com.example.data_repository.LayoutMode
 import com.example.data_repository.MediaRepository
+import com.example.data_repository.PlaybackRequestRepository
 import com.example.data_repository.PlaybackState
 import com.example.data_repository.PlayerStateRepository
 import com.example.data_repository.SettingsRepository
 import com.example.data_repository.ViewMode
+import com.example.feature_browser.DrawerEvent
+import com.example.feature_browser.DrawerUiState
 import dagger.hilt.android.lifecycle.HiltViewModel
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.flow.MutableStateFlow
@@ -30,6 +33,7 @@ data class BrowserUiState(
     val currentPath: String = "",
     val isPathInitialized: Boolean = false,
     val items: List<MediaItem> = emptyList(),
+    val currentIndex: Int = -1,
     val isLoading: Boolean = true,
     val drawerState: DrawerUiState = DrawerUiState(),
     val userMessage: String? = null,
@@ -41,6 +45,7 @@ class BrowserViewModel @Inject constructor(
     private val repository: MediaRepository,
     private val settingsRepository: SettingsRepository,
     private val playerStateRepository: PlayerStateRepository,
+    private val playbackRequestRepository: PlaybackRequestRepository
     //private val savedStateHandle: SavedStateHandle,
     //@ApplicationContext private val context: Context
 ) : ViewModel() {
@@ -201,7 +206,13 @@ class BrowserViewModel @Inject constructor(
         viewModelScope.launch {
             when(event) {
                 is BrowserEvent.OnFolderClicked -> loadItems(event.folder.path)
-                is BrowserEvent.OnTrackClicked -> playerStateRepository.updateCurrentTrack(event.track)
+                is BrowserEvent.OnTrackClicked -> {
+                    playbackRequestRepository.requestPlayback(
+                        path = uiState.value.currentPath,
+                        itemList = uiState.value.items,
+                        currentItem = event.track
+                    )
+                }
                 is BrowserEvent.OnFolderLongClicked -> {
                     settingsRepository.addLocalFavoritePath(event.folder.path)
                     showUserMessage("'${event.folder.path}'をお気に入りに追加しました")
