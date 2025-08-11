@@ -11,7 +11,7 @@ import androidx.compose.material3.Surface
 import androidx.compose.ui.Modifier
 import androidx.navigation.compose.rememberNavController
 import com.example.core_player.PlaybackService
-import com.example.modularstreamplayer.navigation.AppNavHost
+import com.example.feature_browser.navigation.AppNavHost
 import com.example.theme.AppTheme
 import dagger.hilt.android.AndroidEntryPoint
 
