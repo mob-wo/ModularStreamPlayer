@@ -5,11 +5,10 @@ import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import com.example.core_model.FolderItem
 import com.example.core_model.TrackItem
-import com.example.core_model.MediaItem
+import com.example.core_model.FileItem
 import com.example.data_repository.LayoutMode
 import com.example.data_repository.MediaRepository
 import com.example.data_repository.PlaybackRequestRepository
-import com.example.data_repository.PlaybackState
 import com.example.data_repository.PlayerStateRepository
 import com.example.data_repository.SettingsRepository
 import com.example.data_repository.ViewMode
@@ -32,12 +31,11 @@ data class BrowserUiState(
     val rootPath: String = "",
     val currentPath: String = "",
     val isPathInitialized: Boolean = false,
-    val items: List<MediaItem> = emptyList(),
+    val items: List<FileItem> = emptyList(),
     val currentIndex: Int = -1,
     val isLoading: Boolean = true,
     val drawerState: DrawerUiState = DrawerUiState(),
     val userMessage: String? = null,
-    val playbackState: PlaybackState = PlaybackState()
 )
 
 @HiltViewModel
@@ -92,11 +90,7 @@ class BrowserViewModel @Inject constructor(
                 Log.d("BrowserViewModel", "localFavoritePaths emitted: $paths")
             }
         }
-        viewModelScope.launch {
-            playerStateRepository.playbackState.collect { state ->
-                Log.d("BrowserViewModel", "playbackState emitted: $state")
-            }
-        }
+
 
         Log.d("BrowserViewModel", "ViewModel instance: ${this.hashCode()} - init block: About to define uiState combine")
 
@@ -107,7 +101,6 @@ class BrowserViewModel @Inject constructor(
             settingsRepository.layoutMode,
             settingsRepository.viewMode,
             settingsRepository.localFavoritePaths,
-            playerStateRepository.playbackState
         ) { values ->
             Log.d("BrowserViewModel", "COMBINE BLOCK EXECUTED!: ${this.hashCode()}")
 
@@ -116,15 +109,13 @@ class BrowserViewModel @Inject constructor(
             val layoutMode = values[2] as LayoutMode
             val viewMode = values[3] as ViewMode
             val favoritePaths = values[4] as Set<String>
-            val currentPlaybackState = values[5] as PlaybackState
             internalState.copy(
                 drawerState = internalState.drawerState.copy(
                     layoutMode = layoutMode,
                     viewMode = viewMode,
                     favoritePaths = favoritePaths.toList().sorted()
                 ),
-                rootPath = localDefaultPath,
-                playbackState = currentPlaybackState
+                rootPath = localDefaultPath
             )
         }.stateIn(
             scope = viewModelScope,
