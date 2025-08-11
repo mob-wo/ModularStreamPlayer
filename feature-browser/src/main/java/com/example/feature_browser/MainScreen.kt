@@ -9,16 +9,15 @@ import androidx.compose.material3.DrawerValue
 import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.ModalNavigationDrawer
 import androidx.compose.material3.Scaffold
+import androidx.compose.material3.SnackbarHost
 import androidx.compose.material3.SnackbarHostState
 import androidx.compose.material3.rememberDrawerState
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
-import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.layout.layout
 import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.dp
 import androidx.hilt.navigation.compose.hiltViewModel
@@ -31,6 +30,15 @@ import com.example.data_repository.ViewMode
 import com.example.core_model.FolderItem
 import com.example.core_model.TrackItem
 import com.example.data_repository.LayoutMode
+import com.example.feature_browser.browser.BrowserEvent
+import com.example.feature_browser.browser.BrowserScreen
+import com.example.feature_browser.browser.BrowserScreenContent
+import com.example.feature_browser.browser.BrowserTopAppBar
+import com.example.feature_browser.browser.BrowserUiState
+import com.example.feature_browser.browser.BrowserViewModel
+import com.example.feature_browser.browser.previewItems
+import com.example.feature_browser.player.PlayerScreen
+import com.example.feature_browser.player.PlayerScreenContent
 
 import com.example.theme.AppTheme
 import kotlinx.coroutines.launch
@@ -93,6 +101,7 @@ fun MainScreen(
         }
     ) {
         Scaffold(
+            snackbarHost = { SnackbarHost(hostState = snackbarHostState) },
             topBar = {
                 BrowserTopAppBar(
                     title = uiState.currentPath.substringAfterLast('/')
@@ -117,7 +126,11 @@ fun MainScreen(
                                     navController.navigate(ScreenTitle.Player.name)
                                 }
                             }
-                            is FolderItem -> viewModel.onBrowserEvent(BrowserEvent.OnFolderClicked(item))
+                            is FolderItem -> viewModel.onBrowserEvent(
+                                BrowserEvent.OnFolderClicked(
+                                    item
+                                )
+                            )
                         }
                     },
                     onItemLongClick = { item ->
@@ -131,7 +144,8 @@ fun MainScreen(
                 if (uiState.drawerState.viewMode == ViewMode.DUAL) {
                     // TODO: MiniPlayerに必要な状態をuiStateから取得して渡す
                     HorizontalDivider()
-                    PlayerScreenContent(
+                    PlayerScreen(
+                        modifier = Modifier.weight(1f),
                         viewMode = ViewMode.DUAL,
                         paddingValues = PaddingValues(bottom = 0.dp)
                     )
@@ -145,7 +159,7 @@ fun MainScreen(
 
 @Preview(showBackground = true)
 @Composable
-fun MainScreenPreview() {
+fun MainScreenPreview_GRID_MEDIUM() {
     // PreviewではHiltViewModelが使えないため、モックやダミーのViewModelを用意する必要がある。
     // ここでは単純化のため、UIの骨格のみを描画する。
     val navController = rememberNavController()
@@ -166,18 +180,71 @@ fun MainScreenPreview() {
             ) { innerPadding ->
                 Column(modifier = Modifier.padding(innerPadding)) {
                     // ダミーデータでBrowserScreenをプレビュー
-                    BrowserScreen(
+                    BrowserScreenContent(
+                        modifier = Modifier.weight(1f),
                         uiState = BrowserUiState(
                             currentPath = "/Music",
                             items = previewItems,
                             isLoading = false,
                             drawerState = DrawerUiState(layoutMode = LayoutMode.GRID_MEDIUM)
                         ),
-                        loadItems = { },
                         onItemClick = { },
                         onItemLongClick = { }
                     )
-                    PlayerScreenContent(viewMode = ViewMode.DUAL) // 2画面モードを想定したプレビュー
+                    HorizontalDivider()
+                    PlayerScreenContent(
+                        modifier = Modifier.weight(1f),
+                        viewMode = ViewMode.DUAL,
+                        paddingValues = PaddingValues(bottom = 0.dp),
+                        uiState = com.example.feature_browser.player.previewItem
+                    ) // 2画面モードを想定したプレビュー
+                }
+            }
+        }
+    }
+}
+
+@Preview(showBackground = true)
+@Composable
+fun MainScreenPreview_LIST() {
+    // PreviewではHiltViewModelが使えないため、モックやダミーのViewModelを用意する必要がある。
+    // ここでは単純化のため、UIの骨格のみを描画する。
+    val navController = rememberNavController()
+
+    AppTheme {
+        val drawerState = rememberDrawerState(initialValue = DrawerValue.Closed)
+        ModalNavigationDrawer(
+            drawerState = drawerState,
+            drawerContent = {
+                // ダミーのDrawerUiStateでプレビュー
+                AppDrawer(state = DrawerUiState(), onEvent = {})
+            }
+        ) {
+            Scaffold(
+                topBar = {
+                    BrowserTopAppBar(title = "Preview", onNavigationIconClick = {})
+                }
+            ) { innerPadding ->
+                Column(modifier = Modifier.padding(innerPadding)) {
+                    // ダミーデータでBrowserScreenをプレビュー
+                    BrowserScreenContent(
+                        modifier = Modifier.weight(1f),
+                        uiState = BrowserUiState(
+                            currentPath = "/Music",
+                            items = previewItems,
+                            isLoading = false,
+                            drawerState = DrawerUiState(layoutMode = LayoutMode.LIST)
+                        ),
+                        onItemClick = { },
+                        onItemLongClick = { }
+                    )
+                    HorizontalDivider()
+                    PlayerScreenContent(
+                        modifier = Modifier.weight(1f),
+                        viewMode = ViewMode.DUAL,
+                        paddingValues = PaddingValues(bottom = 0.dp),
+                        uiState = com.example.feature_browser.player.previewItem
+                    ) // 2画面モードを想定したプレビュー
                 }
             }
         }
