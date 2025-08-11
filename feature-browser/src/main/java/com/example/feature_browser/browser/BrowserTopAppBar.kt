@@ -1,4 +1,4 @@
-package com.example.feature_browser
+package com.example.feature_browser.browser
 
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Menu
