@@ -3,7 +3,6 @@ package com.example.core_model
 import android.os.Parcelable
 import kotlinx.parcelize.Parcelize
 
-// MediaItem.kt
 sealed interface FileItem {
     val title: String
     val path: String

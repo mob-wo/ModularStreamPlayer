@@ -1,4 +1,4 @@
-## **技術設計書: Modular Stream Player (v1.0) - 改訂版**
+## **技術設計書: Modular Stream Player (v1.0)**
 
 ### 1. アーキテクチャとモジュール構造
 
@@ -8,9 +8,7 @@
 *   **UI → ViewModel → Repository → DataSource** という一方向のデータフローを基本とする。
 *   依存性の注入（DI）には **Hilt** を使用し、各レイヤー間の依存関係を疎結合に保つ。
 
-**1.2. モジュール構成図（フェーズ1時点）**
-
-循環参照を解消し、依存関係を明確にするため`data-repository`モジュールを追加しました。
+**1.2. モジュール構成図**
 
 ```mermaid
 graph TD
@@ -20,6 +18,10 @@ graph TD
 
     subgraph "Feature Layer"
         feature_browser["feature-browser"]
+    end
+    
+    subgraph "UI Common Layer"
+        theme["theme"]
     end
 
     subgraph "Domain Layer"
@@ -35,9 +37,11 @@ graph TD
 
     app --> feature_browser
     app --> core_player
+    app --> theme
 
     feature_browser --> core_model
     feature_browser --> data_repository
+    feature_browser --> theme
 
     core_player --> core_model
 
@@ -48,90 +52,102 @@ graph TD
     data_local --> core_model
     
     data_source --> core_model
-
 ```
 
-*   **:app**: MainActivity, DIコンテナの初期化, Navigation Graphの定義。
-*   **:feature-browser**: `BrowserScreen`, `PlayerScreen`のUIと`BrowserViewModel`, `PlayerViewModel`。`MediaRepository`を利用する。
+*   **:app**: アプリケーションのエントリーポイントと全体的なコンテナ。
+    *   **ModularStreamPlayerApp.kt**: `@HiltAndroidApp` アノテーションを持つApplicationクラス。アプリ全体のDIコンテナを初期化する。
+    *   **MainActivity.kt**: アプリの唯一のActivity (`@AndroidEntryPoint`)。Jetpack ComposeのUIツリーのルートとなり、`AppTheme`とナビゲーションホスト (`AppNavHost`) をセットアップする。
+*   **:feature-browser**: ファイルブラウジングと再生に関連するUIとロジックの機能モジュール。
+    *   **UI**: `BrowserScreen`, `PlayerScreen`, `AppDrawer` などのコンポーザブルを実装。
+    *   **ViewModel**: `BrowserViewModel`, `PlayerViewModel` を実装。
+    *   **Navigation**: `AppNavHost` を含み、アプリ内の画面遷移（ナビゲーショングラフ）を定義する。
 *   **:core-player**: `PlaybackService` (Foreground Service), ExoPlayerの管理, 通知コントロール。
-*   **:core-model**: アプリ共通のデータクラス (`MediaItem`, `PlaybackState`など)。どのモジュールからも依存されない、最も内側のレイヤー。
-*   **:data-repository**: データ層へのアクセス窓口である`MediaRepository`の実装。`data-source`と`data-local`に依存。
+*   **:core-model**: アプリ共通のデータクラス (`FileItem`, `PlaybackState`など)。どのモジュールからも依存されない、最も内側のレイヤー。
+*   **:theme**: アプリ全体の `MaterialTheme`、配色 (`ColorScheme`)、タイポグラフィ (`Typography`) を定義する。UIを持つモジュールから共通で利用される。
+*   **:data-repository**: データ層へのアクセス窓口である`MediaRepository`, `SettingsRepository`などの実装。
 *   **:data-source**: `MediaSource`インターフェースの定義。データソースの「契約」を定義する。
-*   **:data-local**: `LocalMediaSource`の実装。ローカルストレージからのデータ取得ロジックを持つ。`data-source`のインターフェースを実装する。
+*   **:data-local**: `LocalMediaSource`の実装。ローカルストレージからのデータ取得ロジックを持つ。
 
 ---
 
 ### 2. 主要インターフェースとデータクラス定義
 
-コーディングの「契約」となる部分を定義します。
-
 #### **2.1. `:core-model`**
 
 ```kotlin
-// MediaItem.kt
-sealed interface MediaItem {
-    val name: String
+// FileItem.kt
+import android.os.Parcelable
+import kotlinx.parcelize.Parcelize
+
+sealed interface FileItem {
+    val title: String
     val path: String
     val uri: String // 再生や識別に使うURI形式のID
 }
 
+@Parcelize
 data class FolderItem(
-    override val name: String,
+    override val title: String,
     override val path: String,
     override val uri: String
-) : MediaItem
+) : FileItem, Parcelable
 
+@Parcelize
 data class TrackItem(
-    override val name: String,
+    override val title: String,
     override val path: String,
     override val uri: String,
     val artist: String?,
+    val albumId: Long?, // アルバムアート取得などに利用
     val album: String?,
     val artworkUri: String?, // Coilで読み込む用のアートワークURI
     val durationMs: Long
-) : MediaItem
+) : FileItem, Parcelable
 ```
 
 #### **2.2. `:data-source`**
 
-データソースのインターフェース（契約）を定義します。
-
 ```kotlin
 // MediaSource.kt
 interface MediaSource {
-    /** 指定されたパス（フォルダURI）直下のアイテムリストを取得する */
-    suspend fun getItemsIn(folderUri: String?): List<MediaItem>
+    /** 指定された物理パス（フォルダパス）直下のアイテムリストを取得する */
+    suspend fun getItemsIn(folderPath: String?): List<FileItem>
 
-    // (フェーズ3以降) Coilでアートワークを読み込むためのカスタムFetcherを登録するメソッド
+    /** (将来の拡張用) Coilでアートワークを読み込むためのカスタムFetcherを登録する */
     // fun registerCoilExtensions(coilRegistry: ImageLoader.Builder)
 }
 ```
 
 #### **2.3. `:data-repository`**
 
-ViewModelが利用するリポジトリを定義します。
-
 ```kotlin
 // MediaRepository.kt
+@Singleton
 class MediaRepository @Inject constructor(
     private val localMediaSource: MediaSource // DIでインターフェースを注入
 ) {
-    suspend fun getItemsIn(folderUri: String?): List<MediaItem> {
-        // 現状はローカルのみだが、将来的にはここでメディアソースを切り替える
-        // 例: if (isSmb) smbMediaSource.getItemsIn() else localMediaSource.getItemsIn()
-        return localMediaSource.getItemsIn(folderUri)
+    suspend fun getItemsIn(folderPath: String?): List<FileItem> {
+        // 将来的にここでメディアソースを切り替える
+        return localMediaSource.getItemsIn(folderPath)
     }
 }
 ```
-*Note: Hiltの`@Binds`を用いて、`MediaSource`インターフェースに`LocalMediaSource`実装を束縛する設定が別途必要です。*
+
+#### **2.4. UIからの再生要求の伝達 (`PlaybackRequestRepository`)**
+UI（`BrowserViewModel`）からプレーヤー（`PlayerViewModel`）への再生要求を疎結合に伝達するため、`PlaybackRequestRepository` を導入します。
+
+*   **役割**: `BrowserViewModel`でユーザーがトラックをタップした際に、そのトラック情報とプレイリスト（現在のフォルダ内の全アイテム）を含む`PlaybackRequest`オブジェクトを生成し、`StateFlow`で公開します。
+*   **フロー**:
+    1.  `BrowserViewModel` が `requestPlayback()` を呼び出す。
+    2.  `PlaybackRequestRepository` は `StateFlow<PlaybackRequest?>` の値を更新する。
+    3.  `PlayerViewModel` はこの`Flow`を購読しており、`null`でない新しい要求を受け取ると再生処理を開始する。
+    4.  `PlayerViewModel` は処理開始後に `consumePlaybackRequest()` を呼び出し、`Flow`の値を`null`に戻して要求が再実行されるのを防ぐ。
 
 ---
 
 ### 3. 主要機能のシーケンス設計
 
 #### **3.1. ファイルリスト表示シーケンス**
-
-ユーザーがフォルダをタップしてからリストが更新されるまでの流れ。
 
 ```mermaid
 sequenceDiagram
@@ -142,84 +158,80 @@ sequenceDiagram
     participant LocalMediaSource
 
     User->>BrowserScreen: フォルダをタップ
-    BrowserScreen->>BrowserViewModel: loadItems(folderUri)
+    BrowserScreen->>BrowserViewModel: loadItems(folderPath)
     BrowserViewModel->>BrowserViewModel: UI StateをLoadingに変更
-    BrowserViewModel->>MediaRepository: getItemsIn(folderUri)
-    MediaRepository->>LocalMediaSource: getItemsIn(folderUri)
-    LocalMediaSource-->>MediaRepository: List<MediaItem> を返す
-    MediaRepository-->>BrowserViewModel: List<MediaItem> を返す
+    BrowserViewModel->>MediaRepository: getItemsIn(folderPath)
+    MediaRepository->>LocalMediaSource: getItemsIn(folderPath)
+    LocalMediaSource-->>MediaRepository: List<FileItem> を返す
+    MediaRepository-->>BrowserViewModel: List<FileItem> を返す
     BrowserViewModel->>BrowserViewModel: UI StateをSuccess(items)に変更
     BrowserViewModel-->>BrowserScreen: UI Stateを監視し、リストを再描画
 ```
 
-#### **3.2. 音楽再生開始シーケンス (最重要)**
-
-ユーザーが曲をタップしてから再生が開始されるまでの流れ。UIとバックグラウンドサービスが連携する。
+#### **3.2. 音楽再生開始シーケンス**
 
 ```mermaid
 sequenceDiagram
     participant User
     participant BrowserScreen
     participant BrowserViewModel
+    participant PlaybackRequestRepository
+    participant PlayerViewModel
+    participant MediaController
     participant PlaybackService
-    participant ExoPlayer
 
     User->>BrowserScreen: 曲アイテムをタップ
-    BrowserScreen->>BrowserViewModel: onTrackClicked(trackItem)
-    BrowserViewModel->>PlaybackService: コマンドを送信 (setPlaylist, play)
-    Note over PlaybackService: サービスがなければ起動
-
-    PlaybackService->>ExoPlayer: setMediaItem(trackItem.uri)
-    PlaybackService->>ExoPlayer: prepare()
-    PlaybackService->>ExoPlayer: play()
-
-    ExoPlayer->>PlaybackService: 再生状態の変更を通知 (onIsPlayingChanged)
-    PlaybackService->>PlaybackService: 自身の状態を更新し、通知も更新
+    BrowserScreen->>BrowserViewModel: onBrowserEvent(OnTrackClicked)
+    BrowserViewModel->>PlaybackRequestRepository: requestPlayback(...)
+    
+    PlaybackRequestRepository-->>PlayerViewModel: Flow<PlaybackRequest> を発行
+    PlayerViewModel->>PlaybackRequestRepository: consumePlaybackRequest()
+    
+    Note over PlayerViewModel: プレイリスト(MediaItemリスト)を作成
+    
+    PlayerViewModel->>MediaController: setMediaItems(mediaItems), prepare(), play()
+    MediaController->>PlaybackService: (コマンドを転送)
+    
+    PlaybackService->>PlaybackService: ExoPlayerを操作して再生開始
+    
+    Note over PlaybackService, PlayerViewModel: 再生状態の変更をリスナーで通知
+    PlaybackService-->>MediaController: onIsPlayingChanged, onMetadataChanged...
+    MediaController-->>PlayerViewModel: (リスナーが発火)
+    PlayerViewModel->>PlayerViewModel: UiStateを更新
 ```
-
 ---
 
 ### 4. 実装詳細と技術選定理由
 
 #### **4.1. バックグラウンド再生 (`:core-player`)**
-*   **`PlaybackService`**: `MediaLibraryService` (from Jetpack Media3) を継承して実装する。
-    *   これにより、`MediaSession`のライフサイクル管理、通知の自動生成、他のメディアアプリ（Googleアシスタント等）との連携が大幅に簡略化される。
-*   **`ExoPlayer`インスタンス**: `PlaybackService` 内でシングルトンとして管理する。
+*   **`PlaybackService`**: `MediaLibraryService` を継承し、`@AndroidEntryPoint` アノテーションを付与してHiltによる依存性注入を有効化する。
+    *   **依存関係**: `ExoPlayer` インスタンスと `PlayerStateRepository` をHilt経由で注入する。
+    *   **`MediaLibrarySession`**: `onCreate` で `MediaLibrarySession` をビルドし、サービスのメディアセッションとして公開する。これにより、UI側の `MediaController` との接続が可能になる。
+    *   **状態同期**: `player.addListener` を使用して `Player.Listener` を登録し、`onIsPlayingChanged` コールバックを監視する。再生状態が変化すると、`playerStateRepository.setPlaying()` を呼び出してアプリ全体に状態を通知する。
+    *   **ライフサイクル管理**:
+        *   `onTaskRemoved`: アプリがタスク一覧からスワイプされた際、再生中でなければ `stopSelf()` を呼び出してサービスを自己終了させる。
+        *   `onDestroy`: サービスが破棄される際に、`PlayerStateRepository` の状態をリセットし、`ExoPlayer` と `MediaLibrarySession` のリソースを解放 (`release()`) する。
+*   **`ExoPlayer`インスタンス**: Hiltの `PlayerModule` によってシングルトンとして提供され、`PlaybackService` に注入される。設定には、音楽再生用の `AudioAttributes` や、イヤホンが抜かれた際に再生を一時停止する `setHandleAudioBecomingNoisy(true)` が含まれる。
 *   **UIとの通信**:
-    *   **UI → Service**: `MediaController` (from Jetpack Media3) を使って再生/停止などのコマンドを送信する。
-    *   **Service → UI**: `MediaController.Listener` を通じて、再生状態のコールバックを受け取り、ViewModelの`StateFlow`を更新する。
+    *   **UI → Service**: UI側の `MediaController` を通じて、再生、一時停止、プレイリスト設定などのコマンドが `PlaybackService` の `MediaLibrarySession` に送信される。
+    *   **Service → UI (状態共有)**: `PlayerStateRepository` を介して、再生中/停止中の状態がUI（ViewModel）にリアクティブに伝達される。
 
 #### **4.2. ローカルメディアアクセス (`:data-local`)**
 *   **権限**: `READ_MEDIA_AUDIO` (Android 13以上) または `READ_EXTERNAL_STORAGE` (それ以前) の権限が必要。
-*   **データ取得**: `ContentResolver` と `MediaStore` API を使用して、デバイス上のオーディオファイル情報を効率的にクエリする。
-    *   **Projection**: `MediaStore.Audio.Media._ID`, `DISPLAY_NAME`, `ARTIST`, `ALBUM`, `DURATION`などを指定して必要なカラムのみ取得する。
-    *   `ContentUris.withAppendedId(MediaStore.Audio.Media.EXTERNAL_CONTENT_URI, id)` で各トラックのURIを生成する。これが `TrackItem.uri` となる。
-*   **実装クラス**: `LocalMediaSource`クラスがこのロジックを担当する。
-
-#### **4.3. アートワーク表示 (`:data-local` と Coilの連携)**
-*   **課題**: `MediaStore`から直接アートワークのBitmapを取得するのは重い。URIで扱うのがモダンな方法。
-*   **解決策**:
-    1.  `TrackItem.artworkUri` には、アルバムIDから生成したアートワーク用のURI（例: `content://media/external/audio/albumart/{album_id}`）を格納する。
-    2.  Coilは標準で `ContentResolver` を使った `content://` URIの読み込みをサポートしているため、特別な拡張なしで非同期読み込みが可能。
-    ```kotlin
-    // in BrowserScreen.kt
-    AsyncImage(
-        model = trackItem.artworkUri,
-        contentDescription = "Album Art",
-        placeholder = painterResource(id = R.drawable.ic_default_music_art)
-    )
-    ```
-
----
-
-### 5. テスト戦略
-
-*   **単体テスト (Unit Test)**:
-    *   **対象**: ViewModel, Repositoryなど、Androidフレームワークに依存しないロジック。
-    *   **ツール**: `JUnit5`, `MockK` (Mocking), `Turbine` (Flowのテスト)。
-*   **インテグレーションテスト (Instrumentation Test)**:
-    *   **対象**: `ContentResolver` を使った `LocalMediaSource` のクエリなど。
-    *   **ツール**: `AndroidJUnit4`。
-*   **UIテスト (UI Test)**:
-    *   **対象**: Composeの画面とユーザー操作。
-    *   **ツール**: `Espresso`, `Compose Test Rule`。
+*   **ルートパス**: 検索の起点となるルートパスは `/storage/emulated/0/Music` に固定されている。
+*   **データ取得ロジック**:
+    1.  **非同期実行**: `withContext(Dispatchers.IO)` を使用し、ファイルI/OとDBクエリをバックグラウンドスレッドで実行する。
+    2.  **クエリ**: `ContentResolver` を使用し、`MediaStore.Audio.Media.EXTERNAL_CONTENT_URI` に対してクエリを実行する。
+        *   **Projection**: `_ID`, `TITLE`, `DATA` (物理パス), `ARTIST`, `ALBUM`, `ALBUM_ID`, `DURATION` などを取得する。
+        *   **Selection**: SQLの `LIKE` 句 (`DATA LIKE ?`) を用いて、指定されたフォルダパス(`currentPath`)配下にあるすべてのオーディオファイルを一度に取得する。これにより、サブフォルダを再帰的に検索するよりも効率的なデータ取得を実現する。
+    3.  **アイテムの分類**:
+        *   クエリ結果のカーソルをループ処理し、各ファイルの物理パス (`DATA`) を解析する。
+        *   パスがカレントパス直下であれば `TrackItem` としてリストに追加する。
+        *   パスがサブフォルダ内であれば、そのサブフォルダのパスを `Set` に保存しておく（重複排除のため）。
+    4.  **リスト構築**:
+        *   親フォルダへのナビゲーション (`..`) をリストの先頭に追加する（ルートパスでない場合）。
+        *   抽出したサブフォルダパスから `FolderItem` を生成し、リストに追加する。
+        *   抽出したトラック情報から `TrackItem` を生成し、リストに追加する。
+*   **URI生成**:
+    *   `TrackItem.uri`: `ContentUris.withAppendedId(MediaStore.Audio.Media.EXTERNAL_CONTENT_URI, id)` で生成し、再生用のURIとして利用する。
+    *   `TrackItem.artworkUri`: `ContentUris.withAppendedId(Uri.parse("content://media/external/audio/albumart"), albumId)` で生成し、Coilでのアルバムアート表示に利用する。
