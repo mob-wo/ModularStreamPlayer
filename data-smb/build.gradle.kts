@@ -45,6 +45,9 @@ dependencies {
     //implementation(libs.jcifs.ng)
     implementation("eu.agno3.jcifs:jcifs-ng:2.1.7")
 
+    //mp3agic
+    implementation("com.mpatric:mp3agic:0.9.1")
+
     // module
     implementation(project(":core-model"))
     implementation(project(":data-source"))

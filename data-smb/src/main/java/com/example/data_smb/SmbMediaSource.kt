@@ -1,20 +1,28 @@
 package com.example.data_smb
 
+import android.util.Log
 import com.example.core_model.FileItem
 import com.example.core_model.FolderItem
 import com.example.core_model.NasConnection
 import com.example.core_model.TrackItem
 import com.example.data_source.MediaSource
+import com.mpatric.mp3agic.Mp3File
 import jcifs.CIFSContext
 import jcifs.config.PropertyConfiguration
 import jcifs.context.BaseContext
+import jcifs.smb.NtStatus
 import jcifs.smb.NtlmPasswordAuthenticator
 import jcifs.smb.SmbException
 import jcifs.smb.SmbFile
-import jcifs.smb.NtStatus // 正しいインポート jcifs.smb.NtStatus
+import jcifs.smb.SmbFileInputStream
 import kotlinx.coroutines.Dispatchers
-import kotlinx.coroutines.withContext
+import kotlinx.coroutines.flow.Flow
+import kotlinx.coroutines.flow.flow
+import kotlinx.coroutines.flow.flowOn
+import java.io.IOException
+import java.io.InputStream
 import java.util.Properties
+
 
 // カスタム例外クラス (変更なし)
 open class SmbAccessException(message: String, cause: Throwable? = null) : Exception(message, cause)
@@ -50,7 +58,7 @@ class SmbMediaSource(
         }
     }
 
-    override suspend fun getItemsIn(folderPath: String?): List<FileItem> = withContext(Dispatchers.IO) {
+    override fun getItemsIn(folderPath: String?): Flow<FileItem> = flow {
         // 修正箇所: folderPathがnullまたは空文字列の場合、ベースURLを構築する
         val currentSmbPath = if (folderPath.isNullOrEmpty()) {
             buildSmbUrl(nasConnection.path)
@@ -61,9 +69,10 @@ class SmbMediaSource(
         try {
             val file = SmbFile(currentSmbPath, authContext)
             if (!file.exists() || !file.isDirectory) {
-                return@withContext emptyList()
+                return@flow // Flowを完了させる
             }
-            val items = mutableListOf<FileItem>()
+
+            // 1. まずは「..」フォルダを即座に発行
             val rootPathUrl = buildSmbUrl(nasConnection.path)
             // SMBルート自身でない場合のみ「..」を追加
             if (file.canonicalPath.trimEnd('/') != rootPathUrl.trimEnd('/')) {
@@ -72,33 +81,40 @@ class SmbMediaSource(
                 // SmbFile.getParent() は "smb://host/share/" の場合 "smb://host/" を返すことがあるため、
                 // 単純なnullチェックだけでは不十分な場合がある。ここでは、SMBルートとの比較で代替。
                 if (parentPath != null && parentPath.length < file.canonicalPath.length && parentPath.startsWith("smb://")) {
-                     items.add(FolderItem(title = "..", path = parentPath, uri = parentPath))
+                    emit(FolderItem(title = "..", path = parentPath, uri = parentPath))
                 }
             }
-            val files = file.listFiles().sortedBy { it.name.lowercase() }
-            val folders = mutableListOf<FolderItem>()
-            val tracks = mutableListOf<TrackItem>()
 
+            val files = file.listFiles().sortedBy { it.name.lowercase() }
+
+            // 2. 次にフォルダリストをすべて発行（メタデータ不要なので高速）
+            files.forEach { smbFile ->
+                if (smbFile.isDirectory) {
+                    val fileName = smbFile.name.trimEnd('/')
+                    val smbUri = smbFile.canonicalPath
+                    emit(FolderItem(title = fileName, path = smbUri, uri = smbUri))
+                }
+            }
+
+            // 3. 最後にトラックファイルを一つずつ解析して発行（ここが時間のかかる処理）
             files.forEach { smbFile ->
                 val fileName = smbFile.name.trimEnd('/')
-                val smbUri = smbFile.canonicalPath
-                when {
-                    smbFile.isDirectory -> {
-                        folders.add(FolderItem(title = fileName, path = smbUri, uri = smbUri))
-                    }
-                    fileName.endsWith(".mp3", ignoreCase = true) -> {
-                        tracks.add(TrackItem(
-                            title = fileName.substringBeforeLast('.'),
-                            path = smbUri,
-                            uri = smbUri,
-                            artist = null, albumId = null, album = null, artworkUri = null, durationMs = 0L
-                        ))
-                    }
+                if (fileName.endsWith(".mp3", ignoreCase = true)) {
+                    val smbUri = smbFile.canonicalPath
+                    // まずはファイル名だけのプレースホルダを即座に発行
+                    val placeholderTrack = TrackItem(
+                        title = fileName.substringBeforeLast('.'),
+                        path = smbUri,
+                        uri = smbUri,
+                        artist = "読み込み中...", // プレースホルダーテキスト
+                        albumId = null, album = null, artworkUri = null, durationMs = 0L
+                    )
+                    emit(placeholderTrack)
+
+                    // ↓↓↓ ここからが本来のメタデータ解析処理 ↓↓↓
+                    // ただし、このままだとUIが待たされるので、次のセクションで改善します
                 }
             }
-            items.addAll(folders)
-            items.addAll(tracks)
-            items
         } catch (e: SmbException) {
             e.printStackTrace()
             val ntStatus: Int = e.ntStatus
@@ -152,7 +168,68 @@ class SmbMediaSource(
             e.printStackTrace()
             throw SmbAccessException("予期せぬエラーが発生しました: ${e.message}", e)
         }
-    }
+    }.flowOn(Dispatchers.IO) // Flow全体の処理をIOスレッドで実行
+
+    // メタデータ解析のヘルパー関数
+    /*private fun parseTrackMetadata(smbFile: SmbFile): TrackItem {
+        val fileName = smbFile.name.trimEnd('/')
+        val smbUri = smbFile.canonicalPath
+        var inputStream: InputStream? = null
+
+        try {
+            inputStream = SmbFileInputStream(smbFile)
+
+            // Mp3FileのコンストラクタにInputStreamとファイル長を渡す
+            // 第2引数にファイル長を渡すと、ストリームの末尾にあるID3v1タグも読み取ろうと試みる
+            val mp3file = Mp3File(inputStream, smbFile.length())
+
+            val title: String?
+            val artist: String?
+            val album: String?
+
+            if (mp3file.hasId3v2Tag()) {
+                val id3v2Tag = mp3file.id3v2Tag
+                title = id3v2Tag.title
+                artist = id3v2Tag.artist
+                album = id3v2Tag.album
+            } else if (mp3file.hasId3v1Tag()) {
+                val id3v1Tag = mp3file.id3v1Tag
+                title = id3v1Tag.title
+                artist = id3v1Tag.artist
+                album = id3v1Tag.album
+            } else {
+                title = null
+                artist = null
+                album = null
+            }
+
+            return TrackItem(
+                title = title?.ifBlank { null } ?: fileName.substringBeforeLast('.'),
+                path = smbUri,
+                uri = smbUri,
+                artist = artist?.ifBlank { null },
+                album = album?.ifBlank { null },
+                durationMs = mp3file.lengthInMilliseconds,
+                albumId = null,
+                artworkUri = null
+            )
+
+        } catch (e: Exception) {
+            // com.mpatric.mp3agic.InvalidDataException などもここでキャッチ
+            Log.e("SmbMediaSource", "Failed to parse metadata for: ${smbFile.path}", e)
+            return TrackItem(
+                title = fileName.substringBeforeLast('.'),
+                path = smbUri, uri = smbUri,
+                artist = null, albumId = null, album = null, artworkUri = null, durationMs = 0L
+            )
+        } finally {
+            try {
+                inputStream?.close()
+            } catch (e: IOException) {
+                Log.e("SmbMediaSource", "Failed to close input stream", e)
+            }
+        }
+    }*/
 
     private fun buildSmbUrl(sharePath: String): String {
         // sharePath (nasConnection.pathから渡される) を正規化:

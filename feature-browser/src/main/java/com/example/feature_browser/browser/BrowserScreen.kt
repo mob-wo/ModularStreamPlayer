@@ -42,17 +42,16 @@ fun BrowserScreen(
     }
     val permissionState = rememberPermissionState(permission)
 
-    LaunchedEffect(uiState.isPathInitialized, uiState.currentPath, permissionState.status) {
-        if (uiState.isPathInitialized && permissionState.status.isGranted) {
+    /*
+    LaunchedEffect(uiState.currentPath, permissionState.status) {
+        if (permissionState.status.isGranted) {
             Log.d("BrowserScreen", "LaunchedEffect triggered: Path initialized and permission granted. Path: ${uiState.currentPath}")
             loadItems()
-        } else if (!uiState.isPathInitialized) {
-            Log.d("BrowserScreen", "LaunchedEffect skipped: Path not initialized yet.")
         } else { // Permission not granted
             Log.d("BrowserScreen", "LaunchedEffect skipped: Permission not granted.")
             // viewModel.clearItemsOrSetPermissionError()
         }
-    }
+    }*/
 
     if (permissionState.status.isGranted){
         BrowserScreenContent(
