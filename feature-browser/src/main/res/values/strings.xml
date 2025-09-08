@@ -6,6 +6,11 @@
     <string name="screen_title_browser">File Browser</string>
     <string name="screen_title_player">Now Playing</string>
     <string name="screen_title_settings">Settings</string>
+    <string name="screen_title_nas_list">NAS接続設定</string>
+    <string name="screen_title_nas_editor">NAS接続の編集</string>
+    <!-- Graph Name-->
+    <string name="settings_graph">settings_graph</string>
+    settings_graph
     <!-- Navigation Actions -->
     <string name="back">Back</string>
 </resources>

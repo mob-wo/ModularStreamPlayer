@@ -36,34 +36,41 @@ import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.dp
 import com.example.data_repository.LayoutMode
 import com.example.data_repository.ViewMode
+import com.example.core_model.NasConnection
 import java.io.File
 
 // --- ViewModelと連携するためのStateとEventを定義 ---
+
+/**
+ * ドロワーに表示するデータソースの選択肢を表現するモデル。
+ */
+sealed class DataSourceItem(val displayName: String, val id: String) {
+    data object Local : DataSourceItem("ローカルストレージ", "local_storage")
+    data class Smb(val connection: NasConnection) : DataSourceItem(
+        displayName = connection.nickname, // ニックネームを表示名とする
+        id = connection.id                 // 一意なIDとしてNasConnectionのIDを使用
+    )
+}
 
 /**
  * ナビゲーションドロワーが表示に必要な状態をすべて保持するデータクラス
  */
 data class DrawerUiState(
     // 将来の拡張性のため、Enumでデータソース種別を定義
-    val currentDataSource: DataSourceType = DataSourceType.LOCAL,
-    val availableDataSources: List<DataSourceType> = listOf(DataSourceType.LOCAL),
+    val currentDataSource: DataSourceItem = DataSourceItem.Local,
+    val availableDataSources: List<DataSourceItem> = listOf(DataSourceItem.Local),
     val layoutMode: LayoutMode = LayoutMode.LIST,
     val viewMode: ViewMode = ViewMode.SINGLE,
     val favoritePaths: List<String> = emptyList(),
     val isFavoritesExpanded: Boolean = true
 )
 
-enum class DataSourceType(val displayName: String) {
-    LOCAL("ローカルストレージ"),
-    SMB("NAS (SMB)") // Phase 3 for
-}
-
 /**
  * ドロワー内で発生したユーザー操作を表現するイベント
  */
 sealed interface DrawerEvent {
     object OnRefreshClicked : DrawerEvent
-    data class OnDataSourceSelected(val source: DataSourceType) : DrawerEvent
+    data class OnDataSourceSelected(val source: DataSourceItem) : DrawerEvent
     data class OnLayoutModeChanged(val mode: LayoutMode) : DrawerEvent
     data class OnViewModeChanged(val mode: ViewMode) : DrawerEvent
     object OnFavoritesHeaderClicked : DrawerEvent
@@ -102,16 +109,27 @@ fun AppDrawer(
 
             item { HorizontalDivider(modifier = Modifier.padding(vertical = 8.dp)) }
 
-            item {
+            item { DrawerSectionHeader("データソース") } // ヘッダーは単独のitemに
+
+            // ★ ここを修正: LazyColumn の items(list) を使用する
+            items(state.availableDataSources, key = { it.id }) { source ->
+                SelectableItem(
+                    text = source.displayName,
+                    isSelected = state.currentDataSource.id == source.id,
+                    onClick = { onEvent(DrawerEvent.OnDataSourceSelected(source)) }
+                )
+            }
+            /*item {
                 DrawerSectionHeader("データソース")
                 state.availableDataSources.forEach { source ->
                     SelectableItem(
                         text = source.displayName,
-                        isSelected = state.currentDataSource == source,
+                        // ★ idで選択状態を比較
+                        isSelected = state.currentDataSource.id == source.id,
                         onClick = { onEvent(DrawerEvent.OnDataSourceSelected(source)) }
                     )
                 }
-            }
+            }*/
 
             item { HorizontalDivider(modifier = Modifier.padding(vertical = 8.dp)) }
 
@@ -334,8 +352,8 @@ private fun SegmentedButtonItem(
 @Composable
 fun AppDrawerPreview() {
     val previewState = DrawerUiState(
-        currentDataSource = DataSourceType.LOCAL,
-        availableDataSources = listOf(DataSourceType.LOCAL, DataSourceType.SMB),
+        currentDataSource = DataSourceItem.Local,
+        availableDataSources = listOf(DataSourceItem.Local, DataSourceItem.Local),
         layoutMode = LayoutMode.GRID_MEDIUM,
         viewMode = ViewMode.DUAL,
         favoritePaths = listOf(

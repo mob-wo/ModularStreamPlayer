@@ -32,4 +32,21 @@ object PlayerModule {
         setAudioAttributes(audioAttributes, true)
         setHandleAudioBecomingNoisy(true) // イヤホンが抜かれたら一時停止
     }
+
+    // ★★★ 以下のprovideLocalHttpServerメソッドはLocalHttpServerクラスに@Injectコンストラクタと@Singletonを付けたため、明示的な@Providesは不要になりました ★★★
+    // Hiltは@Injectコンストラクタを持つクラスのインスタンスを自動的に生成・提供できます。
+    // LocalHttpServer.ktのクラス宣言が `class LocalHttpServer @Inject constructor(...)` となっていれば、
+    // このモジュールに追記は不要です。
+
+    // 【参考】もしLocalHttpServerに@Injectコンストラクタが付けられない事情がある場合は、
+    // 以下のように記述します。
+    /*
+    @Provides
+    @Singleton
+    fun provideLocalHttpServer(
+        nasCredentialsRepository: com.example.data_repository.NasCredentialsRepository
+    ): LocalHttpServer {
+        return LocalHttpServer(nasCredentialsRepository)
+    }
+    */
 }

@@ -10,9 +10,11 @@ import androidx.media3.common.MediaMetadata
 import androidx.media3.common.Player
 import androidx.media3.session.MediaController
 import androidx.media3.session.SessionToken
-import com.example.core_model.FileItem
 import com.example.core_model.TrackItem
+import com.example.core_player.LocalHttpServer
 import com.example.core_player.PlaybackService
+import com.example.data_repository.ActiveDataSource
+import com.example.data_repository.PlaybackRequest
 import com.example.data_repository.PlaybackRequestRepository
 import com.google.common.util.concurrent.ListenableFuture
 import dagger.hilt.android.lifecycle.HiltViewModel
@@ -87,6 +89,7 @@ data class PlayerUiState(
 class PlayerViewModel @Inject constructor(
     @ApplicationContext private val context: Context,
     private val playbackRequestRepository: PlaybackRequestRepository,
+    private val localHttpServer: LocalHttpServer
     // PlayerStateRepositoryは直接は不要になった
 ) : ViewModel() {
 
@@ -100,6 +103,15 @@ class PlayerViewModel @Inject constructor(
     private var positionUpdateJob: Job? = null
 
     init {
+        try {
+            if (!localHttpServer.isAlive) {
+                localHttpServer.start()
+                Log.d("PlayerViewModel", "LocalHttpServer started.")
+            }
+        } catch (e: Exception) {
+            Log.e("PlayerViewModel", "Failed to start LocalHttpServer", e)
+        }
+
         initializeMediaController()
 
         viewModelScope.launch {
@@ -108,7 +120,7 @@ class PlayerViewModel @Inject constructor(
                 .flatMapLatest { playbackRequestRepository.playbackRequest }
                 .collect { request ->
                     if (request != null) {
-                        startPlayback(request.itemList, request.currentItem)
+                        startPlayback(request)
                         playbackRequestRepository.consumePlaybackRequest()
                     }
                 }
@@ -229,15 +241,30 @@ class PlayerViewModel @Inject constructor(
 
     // isFirstMusic/isLastMusic は uiState に統合
 
-    fun startPlayback(itemList: List<FileItem>, currentItem: TrackItem) {
-        val playlist = itemList.filterIsInstance<TrackItem>()
+    fun startPlayback(request: PlaybackRequest) {
+        val playlist = request.itemList.filterIsInstance<TrackItem>()
         if (playlist.isEmpty()) return
-        val startIndex = playlist.indexOf(currentItem)
+
+        val startIndex = playlist.indexOf(request.currentItem)
         if (startIndex == -1) return
 
         // MediaItemを再ビルドしてクリーンなリストを渡す
-        val mediaItems = playlist.map {
-            MediaItem.fromUri(it.uri)
+        val mediaItems = playlist.map { track ->
+            val uri = when (request.dataSource) {
+                is ActiveDataSource.Local -> {
+                    // ローカルファイルの場合はそのままURIを使用
+                    track.uri
+                }
+                is ActiveDataSource.Smb -> {
+                    // SMBファイルの場合は、LocalHttpServer経由のURLに変換
+                    localHttpServer.getStreamingUrl(
+                        smbPath = track.path,
+                        connectionId = (request.dataSource as ActiveDataSource.Smb).connectionId
+                    )
+                }
+            }
+            // MediaItemをURIから生成
+            MediaItem.fromUri(uri)
         }
 
         mediaController?.let { controller ->
@@ -248,6 +275,11 @@ class PlayerViewModel @Inject constructor(
     }
 
     override fun onCleared() {
+        // ★ サーバーの停止
+        if (localHttpServer.isAlive) {
+            localHttpServer.stop()
+            Log.d("PlayerViewModel", "LocalHttpServer stopped.")
+        }
         stopPositionUpdates()
         mediaController?.release()
         super.onCleared()

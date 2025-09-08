@@ -66,6 +66,9 @@ dependencies {
     // ViewModelでHiltを使うための追加ライブラリ
     implementation(libs.androidx.hilt.navigation.compose)
 
+    // NanoHTTPD
+    implementation(libs.nanohttpd.webserver)
+
     //Jetpack Media3
     implementation(libs.androidx.media3.exoplayer)
     implementation(libs.androidx.media3.session)
@@ -80,6 +83,7 @@ dependencies {
     //module
     implementation(project(":core-model"))
     implementation(project(":core-player"))
+    implementation(project(":data-smb"))
     implementation(project(":data-repository"))
     implementation(project(":theme"))
 

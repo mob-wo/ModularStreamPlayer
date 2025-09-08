@@ -9,6 +9,7 @@ import androidx.datastore.preferences.core.stringSetPreferencesKey
 import androidx.datastore.preferences.preferencesDataStore
 import dagger.hilt.android.qualifiers.ApplicationContext
 import kotlinx.coroutines.flow.Flow
+import kotlinx.coroutines.flow.combine
 import kotlinx.coroutines.flow.map
 import javax.inject.Inject
 import javax.inject.Singleton
@@ -32,6 +33,25 @@ enum class ViewMode {
 }
 
 /**
+ * 現在選択されているデータソースの状態を表現する。
+ */
+sealed interface ActiveDataSource {
+    /** ローカルストレージが選択されている状態 */
+    data object Local : ActiveDataSource
+
+    /** SMB (NAS)が選択されている状態 */
+    data class Smb(val connectionId: String) : ActiveDataSource
+}
+
+/**
+ * DataStoreに保存するためのデータソース種別
+ */
+enum class ActiveDataSourceType {
+    LOCAL,
+    SMB
+}
+
+/**
  * アプリの設定情報を管理するリポジトリ。
  * Jetpack DataStoreを使用して、UI設定やユーザーのお気に入りパスなどを永続化する。
  */
@@ -50,6 +70,10 @@ class SettingsRepository @Inject constructor(
         val LOCAL_FAVORITE_PATHS = stringSetPreferencesKey("local_favorite_paths")
         // デフォルトパス (ローカルストレージ用)
         val LOCAL_DEFAULT_PATH = stringPreferencesKey("local_default_path")
+        // アクティブなデータソースの種別 (LOCAL or SMB)
+        val ACTIVE_DATA_SOURCE_TYPE = stringPreferencesKey("active_data_source_type")
+        // アクティブなNAS接続のID (SMBが選択されている場合のみ)
+        val ACTIVE_NAS_CONNECTION_ID = stringPreferencesKey("active_nas_connection_id")
     }
 
     /**
@@ -91,6 +115,39 @@ class SettingsRepository @Inject constructor(
     val localDefaultPath: Flow<String> = context.dataStore.data.map { preferences ->
         preferences[PreferencesKeys.LOCAL_DEFAULT_PATH] ?: "/storage/emulated/0/Music"
     }
+
+    /**
+     * 現在アクティブなデータソース設定をFlowとして公開する。
+     * DataStoreに保存されている種別とIDを組み合わせて、ActiveDataSourceオブジェクトを生成する。
+     */
+    val activeDataSource: Flow<ActiveDataSource> = combine(
+        context.dataStore.data.map { preferences ->
+            try {
+                ActiveDataSourceType.valueOf(
+                    preferences[PreferencesKeys.ACTIVE_DATA_SOURCE_TYPE] ?: ActiveDataSourceType.LOCAL.name
+                )
+            } catch (e: IllegalArgumentException) {
+                ActiveDataSourceType.LOCAL
+            }
+        },
+        context.dataStore.data.map { preferences ->
+            preferences[PreferencesKeys.ACTIVE_NAS_CONNECTION_ID]
+        }
+    ) { type, connectionId ->
+        when (type) {
+            ActiveDataSourceType.LOCAL -> ActiveDataSource.Local
+            ActiveDataSourceType.SMB -> {
+                if (connectionId != null) {
+                    ActiveDataSource.Smb(connectionId)
+                } else {
+                    // SMBが選択されているのにIDがない場合は、ローカルにフォールバック
+                    ActiveDataSource.Local
+                }
+            }
+        }
+    }
+
+
 
     /**
      * 表示密度設定を更新する。
@@ -137,6 +194,27 @@ class SettingsRepository @Inject constructor(
     suspend fun updateLocalDefaultPath(path: String) {
         context.dataStore.edit { settings ->
             settings[PreferencesKeys.LOCAL_DEFAULT_PATH] = path
+        }
+    }
+
+    /**
+     * アクティブなデータソース設定を更新する。
+     *
+     * @param dataSource 新しく設定するデータソース。
+     */
+    suspend fun updateActiveDataSource(dataSource: ActiveDataSource) {
+        context.dataStore.edit { settings ->
+            when (dataSource) {
+                is ActiveDataSource.Local -> {
+                    settings[PreferencesKeys.ACTIVE_DATA_SOURCE_TYPE] = ActiveDataSourceType.LOCAL.name
+                    // SMBのIDは不要なので削除
+                    settings.remove(PreferencesKeys.ACTIVE_NAS_CONNECTION_ID)
+                }
+                is ActiveDataSource.Smb -> {
+                    settings[PreferencesKeys.ACTIVE_DATA_SOURCE_TYPE] = ActiveDataSourceType.SMB.name
+                    settings[PreferencesKeys.ACTIVE_NAS_CONNECTION_ID] = dataSource.connectionId
+                }
+            }
         }
     }
 }

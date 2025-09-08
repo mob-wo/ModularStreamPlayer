@@ -73,9 +73,7 @@ fun MainScreen(
     LaunchedEffect(uiState.userMessage) {
         uiState.userMessage?.let { message ->
             snackbarHostState.showSnackbar(message)
-            // TODO: ViewModel側でメッセージをクリアする処理を実装するか、
-            //       ここで一定時間後にクリアするイベントをViewModelに送る。
-            //       viewModel.onUserMessageShown()
+            viewModel.onUserMessageShown() // メッセージ表示後にクリア処理を呼び出す
         }
     }
 

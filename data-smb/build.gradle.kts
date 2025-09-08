@@ -1,15 +1,10 @@
 plugins {
     alias(libs.plugins.android.library)
     alias(libs.plugins.kotlin.android)
-    // Kotlin Serialization
-    alias(libs.plugins.kotlin.serialization)
-    // Parcelize
-    alias(libs.plugins.kotlin.parcelize)
-
 }
 
 android {
-    namespace = "com.example.core_model"
+    namespace = "com.example.data_smb"
     compileSdk = 36
 
     defaultConfig {
@@ -42,8 +37,18 @@ dependencies {
     implementation(libs.androidx.core.ktx)
     implementation(libs.androidx.appcompat)
     implementation(libs.material)
-    // Kotlin Serialization
-    implementation(libs.kotlinx.serialization.json)
+
+    // Coroutines
+    implementation(libs.kotlinx.coroutines.core)
+
+    // jcifs-ng
+    //implementation(libs.jcifs.ng)
+    implementation("eu.agno3.jcifs:jcifs-ng:2.1.7")
+
+    // module
+    implementation(project(":core-model"))
+    implementation(project(":data-source"))
+
     testImplementation(libs.junit)
     androidTestImplementation(libs.androidx.junit)
     androidTestImplementation(libs.androidx.espresso.core)

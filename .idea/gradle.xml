@@ -15,6 +15,7 @@
             <option value="$PROJECT_DIR$/core-player" />
             <option value="$PROJECT_DIR$/data-local" />
             <option value="$PROJECT_DIR$/data-repository" />
+            <option value="$PROJECT_DIR$/data-smb" />
             <option value="$PROJECT_DIR$/data-source" />
             <option value="$PROJECT_DIR$/feature-browser" />
             <option value="$PROJECT_DIR$/theme" />

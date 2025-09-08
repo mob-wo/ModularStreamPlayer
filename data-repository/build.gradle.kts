@@ -57,7 +57,13 @@ dependencies {
     implementation(project(":core-model"))
     implementation(project(":data-local"))
     implementation(project(":data-source"))
+    implementation(project(":data-smb"))
 
+    // Jetpack Security
+    implementation(libs.androidx.security.crypto)
+
+    // Kotlin Serialization
+    implementation(libs.kotlinx.serialization.json)
 
     testImplementation(libs.junit)
     androidTestImplementation(libs.androidx.junit)

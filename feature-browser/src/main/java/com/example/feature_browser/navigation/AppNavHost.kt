@@ -1,15 +1,25 @@
 package com.example.feature_browser.navigation
 
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.remember
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.res.stringResource
+import androidx.hilt.navigation.compose.hiltViewModel
+import androidx.navigation.NavGraphBuilder
 import androidx.navigation.NavHostController
+import androidx.navigation.NavType
 import androidx.navigation.compose.NavHost
 import androidx.navigation.compose.composable
+import androidx.navigation.navArgument
+import androidx.navigation.navigation
 import com.example.feature_browser.MainScreen
-import com.example.feature_browser.SettingsScreen
+import com.example.feature_browser.R
 import com.example.feature_browser.ScreenTitle
+import com.example.feature_browser.settings.SettingsScreen
 import com.example.feature_browser.player.PlayerFullScreen
-
+import com.example.feature_browser.settings.NasConnectionEditorScreen
+import com.example.feature_browser.settings.NasConnectionListScreen
+import com.example.feature_browser.settings.SettingsViewModel
 
 /**
  * アプリ全体のナビゲーションを管理するNavHostコンポーザブル。
@@ -52,11 +62,67 @@ fun AppNavHost(
          */
         composable(route = ScreenTitle.Settings.name) {
             SettingsScreen(
+                navController = navController,
+                onNavigateUp = { navController.navigateUp() }
+            )
+        }
+        settingsGraph(navController)
+    }
+}
+
+
+/**
+ * NAS接続管理に関連する画面のナビゲーションを定義する拡張関数。
+ * これにより、SettingsViewModelがこのグラフ内で共有される。
+ */
+fun NavGraphBuilder.settingsGraph(navController: NavHostController) {
+    navigation(
+        startDestination = ScreenTitle.NasConnectionList.name,
+        route = ScreenTitle.SettingsGraph.name // ★ このグラフのエントリーポイント
+    ) {
+        /**
+         * NAS接続一覧画面
+         */
+        composable(route = ScreenTitle.NasConnectionList.name) { navBackStackEntry ->
+            // このグラフを親とするViewModelを取得
+            val parentEntry = remember(navBackStackEntry) {
+                navController.getBackStackEntry(ScreenTitle.SettingsGraph.name)
+            }
+            val viewModel: SettingsViewModel = hiltViewModel(parentEntry)
+
+            NasConnectionListScreen(
+                viewModel = viewModel,
+                onNavigateToEditor = { connectionId ->
+                    val route = "${ScreenTitle.NasConnectionEditor.name}?connectionId=${connectionId}"
+                    navController.navigate(route)
+                },
+                onNavigateUp = { navController.navigateUp() }
+            )
+        }
+
+        /**
+         * NAS接続編集画面
+         */
+        composable(
+            route = "${ScreenTitle.NasConnectionEditor.name}?connectionId={connectionId}",
+            arguments = listOf(navArgument("connectionId") {
+                type = NavType.StringType
+                nullable = true
+                defaultValue = null
+            })
+        ) { navBackStackEntry ->
+            // このグラフを親とするViewModelを取得
+            val parentEntry = remember(navBackStackEntry) {
+                navController.getBackStackEntry(ScreenTitle.SettingsGraph.name)
+            }
+            val viewModel: SettingsViewModel = hiltViewModel(parentEntry)
+            val connectionId = navBackStackEntry.arguments?.getString("connectionId")
+
+            NasConnectionEditorScreen(
+                viewModel = viewModel,
+                connectionId = connectionId,
                 onNavigateUp = { navController.navigateUp() }
             )
         }
     }
 }
-
-
-
