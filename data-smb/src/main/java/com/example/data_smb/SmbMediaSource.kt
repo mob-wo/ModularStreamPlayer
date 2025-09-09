@@ -1,12 +1,15 @@
 package com.example.data_smb
 
+import android.media.MediaMetadataRetriever
 import android.util.Log
 import com.example.core_model.FileItem
 import com.example.core_model.FolderItem
 import com.example.core_model.NasConnection
 import com.example.core_model.TrackItem
+import com.example.core_http.LocalHttpServer
 import com.example.data_source.MediaSource
-import com.mpatric.mp3agic.Mp3File
+import dagger.assisted.Assisted
+import dagger.assisted.AssistedInject
 import jcifs.CIFSContext
 import jcifs.config.PropertyConfiguration
 import jcifs.context.BaseContext
@@ -14,13 +17,10 @@ import jcifs.smb.NtStatus
 import jcifs.smb.NtlmPasswordAuthenticator
 import jcifs.smb.SmbException
 import jcifs.smb.SmbFile
-import jcifs.smb.SmbFileInputStream
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.flow
 import kotlinx.coroutines.flow.flowOn
-import java.io.IOException
-import java.io.InputStream
 import java.util.Properties
 
 
@@ -32,8 +32,9 @@ class SmbShareNotFoundException(message: String, cause: Throwable? = null) : Smb
 class SmbPermissionException(message: String, cause: Throwable? = null) : SmbAccessException(message, cause)
 class SmbNetworkException(message: String, cause: Throwable? = null) : SmbAccessException(message, cause)
 
-class SmbMediaSource(
-    private val nasConnection: NasConnection
+class SmbMediaSource @AssistedInject constructor(
+    private val localHttpServer: LocalHttpServer, // Hiltが提供する依存関係
+    @Assisted private val nasConnection: NasConnection // 実行時に外部から提供される依存関係
 ) : MediaSource {
 
     private val authContext: CIFSContext
@@ -170,38 +171,28 @@ class SmbMediaSource(
         }
     }.flowOn(Dispatchers.IO) // Flow全体の処理をIOスレッドで実行
 
-    // メタデータ解析のヘルパー関数
-    /*private fun parseTrackMetadata(smbFile: SmbFile): TrackItem {
+    /**
+     * MediaMetadataRetrieverを使ってSMBファイルのメタデータを解析する
+     */
+    private fun parseTrackMetadata(smbFile: SmbFile): TrackItem {
         val fileName = smbFile.name.trimEnd('/')
         val smbUri = smbFile.canonicalPath
-        var inputStream: InputStream? = null
+        val retriever = MediaMetadataRetriever()
 
         try {
-            inputStream = SmbFileInputStream(smbFile)
+            // 1. LocalHttpServerを使って、SMBパスからHTTP URLを生成
+            val httpUrl = localHttpServer.getStreamingUrl(smbUri, nasConnection.id)
 
-            // Mp3FileのコンストラクタにInputStreamとファイル長を渡す
-            // 第2引数にファイル長を渡すと、ストリームの末尾にあるID3v1タグも読み取ろうと試みる
-            val mp3file = Mp3File(inputStream, smbFile.length())
+            // 2. MediaMetadataRetrieverにHTTP URLと空のヘッダーをセット
+            //    (認証はLocalHttpServerが内部で行うため、ここではヘッダー不要)
+            retriever.setDataSource(httpUrl, HashMap<String, String>())
 
-            val title: String?
-            val artist: String?
-            val album: String?
-
-            if (mp3file.hasId3v2Tag()) {
-                val id3v2Tag = mp3file.id3v2Tag
-                title = id3v2Tag.title
-                artist = id3v2Tag.artist
-                album = id3v2Tag.album
-            } else if (mp3file.hasId3v1Tag()) {
-                val id3v1Tag = mp3file.id3v1Tag
-                title = id3v1Tag.title
-                artist = id3v1Tag.artist
-                album = id3v1Tag.album
-            } else {
-                title = null
-                artist = null
-                album = null
-            }
+            // 3. 各メタデータを抽出
+            val title = retriever.extractMetadata(MediaMetadataRetriever.METADATA_KEY_TITLE)
+            val artist = retriever.extractMetadata(MediaMetadataRetriever.METADATA_KEY_ARTIST)
+            val album = retriever.extractMetadata(MediaMetadataRetriever.METADATA_KEY_ALBUM)
+            val durationStr = retriever.extractMetadata(MediaMetadataRetriever.METADATA_KEY_DURATION)
+            val durationMs = durationStr?.toLongOrNull() ?: 0L
 
             return TrackItem(
                 title = title?.ifBlank { null } ?: fileName.substringBeforeLast('.'),
@@ -209,27 +200,23 @@ class SmbMediaSource(
                 uri = smbUri,
                 artist = artist?.ifBlank { null },
                 album = album?.ifBlank { null },
-                durationMs = mp3file.lengthInMilliseconds,
+                durationMs = durationMs,
                 albumId = null,
-                artworkUri = null
+                artworkUri = null // アートワークも retriever.embeddedPicture で取得可能
             )
-
         } catch (e: Exception) {
-            // com.mpatric.mp3agic.InvalidDataException などもここでキャッチ
-            Log.e("SmbMediaSource", "Failed to parse metadata for: ${smbFile.path}", e)
+            Log.e("SmbMediaSource", "Failed to retrieve metadata for: ${smbFile.path}", e)
+            // 解析に失敗した場合は、ファイル名だけの情報を返す
             return TrackItem(
                 title = fileName.substringBeforeLast('.'),
                 path = smbUri, uri = smbUri,
                 artist = null, albumId = null, album = null, artworkUri = null, durationMs = 0L
             )
         } finally {
-            try {
-                inputStream?.close()
-            } catch (e: IOException) {
-                Log.e("SmbMediaSource", "Failed to close input stream", e)
-            }
+            // 4. 必ずリソースを解放する
+            retriever.release()
         }
-    }*/
+    }
 
     private fun buildSmbUrl(sharePath: String): String {
         // sharePath (nasConnection.pathから渡される) を正規化:
@@ -250,5 +237,10 @@ class SmbMediaSource(
             smbUrl += "/"                     // 例: "smb://server/myshare/sub/" または "smb://server/myshare/"
         }
         return smbUrl
+    }
+
+    @dagger.assisted.AssistedFactory
+    interface Factory {
+        fun create(nasConnection: NasConnection): SmbMediaSource
     }
 }

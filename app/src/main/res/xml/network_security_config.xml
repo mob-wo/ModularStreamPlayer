@@ -1,0 +1,5 @@
+<network-security-config>
+    <domain-config cleartextTrafficPermitted="true">
+        <domain includeSubdomains="true">127.0.0.1</domain> <!-- 今回のエラーの場合 -->
+    </domain-config>
+</network-security-config>

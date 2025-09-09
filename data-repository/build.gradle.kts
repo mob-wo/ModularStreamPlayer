@@ -46,18 +46,12 @@ dependencies {
     // Jetpack DataStore (Preferences)
     implementation(libs.androidx.datastore.preferences)
 
-    // mp3agic (MP3 メタデータライブラリ)
-    implementation(libs.mp3agic)
-
     // Hilt
     implementation(libs.hilt.android)
     ksp(libs.hilt.compiler)
 
     //Module
     implementation(project(":core-model"))
-    implementation(project(":data-local"))
-    implementation(project(":data-source"))
-    implementation(project(":data-smb"))
 
     // Jetpack Security
     implementation(libs.androidx.security.crypto)

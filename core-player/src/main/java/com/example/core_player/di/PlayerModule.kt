@@ -3,7 +3,6 @@ package com.example.core_player.di
 import android.content.Context
 import androidx.media3.common.AudioAttributes
 import androidx.media3.common.C
-import androidx.media3.common.Player
 import androidx.media3.exoplayer.ExoPlayer
 import dagger.Module
 import dagger.Provides

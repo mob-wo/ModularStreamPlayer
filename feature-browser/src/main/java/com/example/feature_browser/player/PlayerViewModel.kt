@@ -11,7 +11,7 @@ import androidx.media3.common.Player
 import androidx.media3.session.MediaController
 import androidx.media3.session.SessionToken
 import com.example.core_model.TrackItem
-import com.example.core_player.LocalHttpServer
+import com.example.core_http.LocalHttpServer
 import com.example.core_player.PlaybackService
 import com.example.data_repository.ActiveDataSource
 import com.example.data_repository.PlaybackRequest

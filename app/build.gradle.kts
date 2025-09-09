@@ -73,6 +73,12 @@ dependencies {
     //module
     implementation(project(":core-model"))
     implementation(project(":core-player"))
+    implementation(project(":core-http"))           // LocalHttpServer が存在するモジュール
+
+    implementation(project(":data-repository"))    // NasCredentialsRepository, SecurityModule, DispatchersModule が存在するモジュール
+    implementation(project(":data-smb"))            // SmbMediaSource が存在するモジュール
+    implementation(project(":data-media-repository")) // DataSourceModule, MediaRepository が存在するモジュール
+
     implementation(project(":feature-browser"))
     implementation(project(":theme"))
 

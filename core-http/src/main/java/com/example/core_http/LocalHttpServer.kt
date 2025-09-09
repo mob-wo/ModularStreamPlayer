@@ -1,17 +1,14 @@
-package com.example.core_player
+package com.example.core_http
 
 import android.util.Log
 import com.example.core_model.NasConnection
 import com.example.data_repository.NasCredentialsRepository
 import fi.iki.elonen.NanoHTTPD
-import jcifs.CIFSContext
 import jcifs.config.PropertyConfiguration
 import jcifs.context.BaseContext
 import jcifs.smb.NtlmPasswordAuthenticator
 import jcifs.smb.SmbFile
-import kotlinx.coroutines.runBlocking
 import java.io.InputStream
-import java.net.URLDecoder
 import java.util.Properties
 import javax.inject.Inject
 import javax.inject.Singleton

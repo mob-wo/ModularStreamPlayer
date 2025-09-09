@@ -1,17 +1,19 @@
-package com.example.data_repository
+package com.example.data_media_repository
 
 import com.example.core_model.FileItem
-import com.example.data_repository.di.LocalSource
-// import com.example.data_smb.SmbAccessException // Flowが例外を伝播するため、ここで直接キャッチしない場合は不要になる可能性
+import com.example.core_model.NasConnection
+import com.example.data_media_repository.di.LocalSource
+import com.example.data_repository.ActiveDataSource
+import com.example.data_repository.NasCredentialsRepository
+import com.example.data_repository.SettingsRepository
 import com.example.data_smb.SmbMediaSource
 import com.example.data_source.MediaSource
 import kotlinx.coroutines.Dispatchers
-import kotlinx.coroutines.flow.Flow // Flow をインポート
-import kotlinx.coroutines.flow.emitAll // emitAll をインポート
+import kotlinx.coroutines.flow.Flow
+import kotlinx.coroutines.flow.emitAll
 import kotlinx.coroutines.flow.first
-import kotlinx.coroutines.flow.flow // flow ビルダーをインポート
-import kotlinx.coroutines.flow.flowOn // flowOn をインポート
-// import kotlinx.coroutines.withContext // 不要になるためコメントアウトまたは削除
+import kotlinx.coroutines.flow.flow
+import kotlinx.coroutines.flow.flowOn
 import javax.inject.Inject
 import javax.inject.Singleton
 
@@ -19,7 +21,8 @@ import javax.inject.Singleton
 class MediaRepository @Inject constructor(
     @LocalSource private val localMediaSource: MediaSource,
     private val settingsRepository: SettingsRepository,
-    private val nasCredentialsRepository: NasCredentialsRepository
+    private val nasCredentialsRepository: NasCredentialsRepository,
+    private val smbMediaSourceFactory: SmbMediaSource.Factory
 ) {
     /**
      * 現在アクティブなデータソースから、指定されたパスのアイテムリストのFlowを取得する。
@@ -38,14 +41,16 @@ class MediaRepository @Inject constructor(
                 // ローカルストレージが選択されている場合
                 localMediaSource
             }
+
             is ActiveDataSource.Smb -> {
                 // SMB (NAS) が選択されている場合
                 // 1. 接続IDから接続情報を取得 (これもsuspend)
-                val connection = nasCredentialsRepository.getConnectionById(activeDataSource.connectionId)
-                    ?: throw IllegalStateException("SMB connection with ID ${activeDataSource.connectionId} not found.")
+                val connection =
+                    nasCredentialsRepository.getConnectionById(activeDataSource.connectionId)
+                        ?: throw IllegalStateException("SMB connection with ID ${activeDataSource.connectionId} not found.")
 
                 // 2. 接続情報を使ってSmbMediaSourceを動的に生成
-                SmbMediaSource(connection)
+                smbMediaSourceFactory.create(connection)
             }
         }
 

@@ -57,12 +57,6 @@ dependencies {
     implementation(project(":core-model"))
     implementation(project(":data-repository"))
 
-    // NanoHTTPD
-    implementation(libs.nanohttpd.webserver)
-
-    // jcifs-ng
-    //implementation(libs.jcifs.ng)
-    implementation("eu.agno3.jcifs:jcifs-ng:2.1.7")
 
     testImplementation(libs.junit)
     androidTestImplementation(libs.androidx.junit)

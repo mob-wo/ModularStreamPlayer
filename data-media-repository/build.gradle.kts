@@ -1,7 +1,6 @@
 plugins {
     alias(libs.plugins.android.library)
     alias(libs.plugins.kotlin.android)
-
     // kpsプラグイン
     alias(libs.plugins.ksp)
     // Hiltプラグイン
@@ -9,7 +8,7 @@ plugins {
 }
 
 android {
-    namespace = "com.example.data_smb"
+    namespace = "com.example.data_media_repository"
     compileSdk = 36
 
     defaultConfig {
@@ -43,8 +42,8 @@ dependencies {
     implementation(libs.androidx.appcompat)
     implementation(libs.material)
 
-    // Coroutines
-    implementation(libs.kotlinx.coroutines.core)
+    // mp3agic (MP3 メタデータライブラリ)
+    //implementation(libs.mp3agic)
 
     // Hilt
     implementation(libs.hilt.android)
@@ -54,16 +53,16 @@ dependencies {
     //implementation(libs.jcifs.ng)
     implementation("eu.agno3.jcifs:jcifs-ng:2.1.7")
 
-    //mp3agic
-    //implementation("com.mpatric:mp3agic:0.9.1")
-
     // NanoHTTPD
     implementation(libs.nanohttpd.webserver)
-    
-    // module
+
+    //Module
     implementation(project(":core-model"))
-    implementation(project(":core-http"))
+    implementation(project(":data-local"))
     implementation(project(":data-source"))
+    implementation(project(":data-smb"))
+    implementation(project(":data-repository"))
+    implementation(project(":core-http"))
 
     testImplementation(libs.junit)
     androidTestImplementation(libs.androidx.junit)

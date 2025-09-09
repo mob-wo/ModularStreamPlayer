@@ -9,7 +9,7 @@ plugins {
 }
 
 android {
-    namespace = "com.example.data_smb"
+    namespace = "com.example.core_http"
     compileSdk = 36
 
     defaultConfig {
@@ -43,9 +43,6 @@ dependencies {
     implementation(libs.androidx.appcompat)
     implementation(libs.material)
 
-    // Coroutines
-    implementation(libs.kotlinx.coroutines.core)
-
     // Hilt
     implementation(libs.hilt.android)
     ksp(libs.hilt.compiler)
@@ -54,16 +51,12 @@ dependencies {
     //implementation(libs.jcifs.ng)
     implementation("eu.agno3.jcifs:jcifs-ng:2.1.7")
 
-    //mp3agic
-    //implementation("com.mpatric:mp3agic:0.9.1")
-
     // NanoHTTPD
     implementation(libs.nanohttpd.webserver)
-    
-    // module
+
+    //Module
     implementation(project(":core-model"))
-    implementation(project(":core-http"))
-    implementation(project(":data-source"))
+    implementation(project(":data-repository"))
 
     testImplementation(libs.junit)
     androidTestImplementation(libs.androidx.junit)

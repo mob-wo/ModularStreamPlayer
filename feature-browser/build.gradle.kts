@@ -83,8 +83,10 @@ dependencies {
     //module
     implementation(project(":core-model"))
     implementation(project(":core-player"))
+    implementation(project(":core-http"))
     implementation(project(":data-smb"))
     implementation(project(":data-repository"))
+    implementation(project(":data-media-repository"))
     implementation(project(":theme"))
 
     testImplementation(libs.junit)

@@ -9,7 +9,7 @@ import com.example.core_model.NasConnection
 import com.example.core_model.TrackItem
 import com.example.data_repository.ActiveDataSource
 import com.example.data_repository.LayoutMode
-import com.example.data_repository.MediaRepository
+import com.example.data_media_repository.MediaRepository
 import com.example.data_repository.NasCredentialsRepository
 import com.example.data_repository.PlaybackRequestRepository
 import com.example.data_repository.PlayerStateRepository
