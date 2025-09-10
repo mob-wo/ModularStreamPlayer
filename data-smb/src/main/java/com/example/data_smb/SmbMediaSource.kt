@@ -23,6 +23,7 @@ import kotlinx.coroutines.flow.flow
 import kotlinx.coroutines.flow.flowOn
 import kotlinx.coroutines.withContext
 import java.util.Properties
+import kotlinx.coroutines.CancellationException // ★★★ CancellationExceptionをインポート ★★★
 
 
 // カスタム例外クラス (変更なし)
@@ -152,6 +153,8 @@ class SmbMediaSource @AssistedInject constructor(
                     throw SmbAccessException("NASアクセスエラー: $displayMessage", e)
                 }
             }
+        } catch (e: CancellationException) { // ★★★ CancellationExceptionをキャッチして再スロー ★★★
+            throw e
         } catch (e: Exception) {
             e.printStackTrace()
             throw SmbAccessException("予期せぬエラーが発生しました: ${e.message}", e)
@@ -204,6 +207,8 @@ class SmbMediaSource @AssistedInject constructor(
                 albumId = null,
                 artworkUri = null
             )
+        } catch (e: CancellationException) { // ★★★ CancellationExceptionをキャッチして再スロー ★★★
+            throw e
         } catch (e: Exception) {
             Log.e("SmbMediaSource", "parseTrackMetadata: メタデータ取得失敗 smbUri: ${smbFile.path}. 例外: ${e.javaClass.simpleName} - ${e.message}", e)
             return TrackItem(

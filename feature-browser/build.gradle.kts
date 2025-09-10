@@ -84,6 +84,7 @@ dependencies {
     implementation(project(":core-model"))
     implementation(project(":core-player"))
     implementation(project(":core-http"))
+    implementation(project(":data-source"))
     implementation(project(":data-smb"))
     implementation(project(":data-repository"))
     implementation(project(":data-media-repository"))
