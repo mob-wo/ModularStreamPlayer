@@ -27,6 +27,7 @@ import com.example.data_smb.SmbPermissionException
 import com.example.data_smb.SmbShareNotFoundException
 // --- ここまで追加 ---
 import dagger.hilt.android.lifecycle.HiltViewModel
+import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.SharingStarted
@@ -65,6 +66,7 @@ class BrowserViewModel @Inject constructor(
 
     private val _internalUiState = MutableStateFlow(BrowserUiState())
     val uiState: StateFlow<BrowserUiState>
+    private val _detailedTracks = MutableStateFlow<Map<String, TrackItem>>(emptyMap())
 
     // ファイル読み込みジョブを管理
     private var loadItemsJob: Job? = null
@@ -79,24 +81,30 @@ class BrowserViewModel @Inject constructor(
         // combineは、_internalUiStateと外部設定をマージする役割に徹する
         uiState = combine(
             _internalUiState,
+            _detailedTracks,
             settingsRepository.layoutMode,
             settingsRepository.viewMode,
             settingsRepository.localFavoritePaths,
             nasCredentialsRepository.connections
         ) { values ->
             val internalState = values[0] as BrowserUiState
-            val layoutMode = values[1] as LayoutMode
-            val viewMode = values[2] as ViewMode
-            val favoritePaths = values[3] as Set<String>
-            val nasConnections = values[4] as List<NasConnection>
+            val detailedTracksMap = values[1] as Map<String, TrackItem>
+            val layoutMode = values[2] as LayoutMode
+            val viewMode = values[3] as ViewMode
+            val favoritePaths = values[4] as Set<String>
+            val nasConnections = values[5] as List<NasConnection>
 
             val availableDataSources = buildList {
                 add(DataSourceItem.Local)
                 addAll(nasConnections.map { DataSourceItem.Smb(it) })
             }
+            val mergedItems = internalState.items.map { item ->
+                detailedTracksMap[item.path] ?: item // マップに詳細があればそれを使う
+            }
 
             // internalStateをベースに、外部設定をマージして最終的なUI状態を返す
             internalState.copy(
+                items = mergedItems,
                 drawerState = internalState.drawerState.copy(
                     layoutMode = layoutMode,
                     viewMode = viewMode,
@@ -152,6 +160,36 @@ class BrowserViewModel @Inject constructor(
 
     fun onUserMessageShown() {
         _internalUiState.update { it.copy(userMessage = null) }
+    }
+
+    /**
+     * UI（Compose）から呼び出される。表示されたアイテムのメタデータを読み込む
+     */
+    fun loadMetadataForVisibleItems(visibleItems: List<FileItem>) {
+        viewModelScope.launch {
+            visibleItems
+                .filterIsInstance<TrackItem>()
+                // メタデータがまだ読み込まれていないトラックのみを対象
+                .filter { it.artist == null && it.durationMs == 0L }
+                // 現在キャッシュにないもののみを対象
+                .filter { !_detailedTracks.value.containsKey(it.path) }
+                .forEach { trackToLoad ->
+                    launch(Dispatchers.IO) { // 各アイテムの読み込みを並行して行う
+                        try {
+                            // MediaRepository経由で詳細情報を取得
+                            val detailedTrack = mediaRepository.getTrackDetails(trackToLoad)
+                            if (detailedTrack != null) {
+                                // 取得した詳細情報をキャッシュに追加
+                                _detailedTracks.update { currentMap ->
+                                    currentMap + (detailedTrack.path to detailedTrack)
+                                }
+                            }
+                        } catch (e: Exception) {
+                            Log.e("ViewModel", "Failed to load metadata for ${trackToLoad.path}", e)
+                        }
+                    }
+                }
+        }
     }
 
     // --- プライベートなサブルーチン ---

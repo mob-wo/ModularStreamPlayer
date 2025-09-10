@@ -21,6 +21,7 @@ import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.flow
 import kotlinx.coroutines.flow.flowOn
+import kotlinx.coroutines.withContext
 import java.util.Properties
 
 
@@ -60,7 +61,7 @@ class SmbMediaSource @AssistedInject constructor(
     }
 
     override fun getItemsIn(folderPath: String?): Flow<FileItem> = flow {
-        // 修正箇所: folderPathがnullまたは空文字列の場合、ベースURLを構築する
+        // folderPathがnullまたは空文字列の場合、ベースURLを構築する
         val currentSmbPath = if (folderPath.isNullOrEmpty()) {
             buildSmbUrl(nasConnection.path)
         } else {
@@ -75,12 +76,8 @@ class SmbMediaSource @AssistedInject constructor(
 
             // 1. まずは「..」フォルダを即座に発行
             val rootPathUrl = buildSmbUrl(nasConnection.path)
-            // SMBルート自身でない場合のみ「..」を追加
             if (file.canonicalPath.trimEnd('/') != rootPathUrl.trimEnd('/')) {
-                val parentPath = file.parent // 親パスを取得
-                // 親パスがnullでなく、かつSMBルートより深い階層にある場合のみ「..」を追加
-                // SmbFile.getParent() は "smb://host/share/" の場合 "smb://host/" を返すことがあるため、
-                // 単純なnullチェックだけでは不十分な場合がある。ここでは、SMBルートとの比較で代替。
+                val parentPath = file.parent
                 if (parentPath != null && parentPath.length < file.canonicalPath.length && parentPath.startsWith("smb://")) {
                     emit(FolderItem(title = "..", path = parentPath, uri = parentPath))
                 }
@@ -88,7 +85,7 @@ class SmbMediaSource @AssistedInject constructor(
 
             val files = file.listFiles().sortedBy { it.name.lowercase() }
 
-            // 2. 次にフォルダリストをすべて発行（メタデータ不要なので高速）
+            // 2. 次にフォルダリストをすべて発行
             files.forEach { smbFile ->
                 if (smbFile.isDirectory) {
                     val fileName = smbFile.name.trimEnd('/')
@@ -97,61 +94,51 @@ class SmbMediaSource @AssistedInject constructor(
                 }
             }
 
-            // 3. 最後にトラックファイルを一つずつ解析して発行（ここが時間のかかる処理）
+            // 3. 最後にトラックファイルを一つずつ発行
             files.forEach { smbFile ->
                 val fileName = smbFile.name.trimEnd('/')
                 if (fileName.endsWith(".mp3", ignoreCase = true)) {
                     val smbUri = smbFile.canonicalPath
-                    // まずはファイル名だけのプレースホルダを即座に発行
                     val placeholderTrack = TrackItem(
                         title = fileName.substringBeforeLast('.'),
                         path = smbUri,
                         uri = smbUri,
-                        artist = "読み込み中...", // プレースホルダーテキスト
+                        artist = null,
                         albumId = null, album = null, artworkUri = null, durationMs = 0L
                     )
                     emit(placeholderTrack)
-
-                    // ↓↓↓ ここからが本来のメタデータ解析処理 ↓↓↓
-                    // ただし、このままだとUIが待たされるので、次のセクションで改善します
                 }
             }
         } catch (e: SmbException) {
             e.printStackTrace()
             val ntStatus: Int = e.ntStatus
-            // jcifs-ng 2.1.7 の jcifs.smb.NtStatus で定義されている定数のみを使用
             when (ntStatus) {
-                // Authentication Errors
                 NtStatus.NT_STATUS_LOGON_FAILURE,
                 NtStatus.NT_STATUS_WRONG_PASSWORD,
                 NtStatus.NT_STATUS_ACCOUNT_DISABLED,
                 NtStatus.NT_STATUS_PASSWORD_EXPIRED,
-                NtStatus.NT_STATUS_ACCOUNT_RESTRICTION, // '''S''' がつくのが正しい
-                NtStatus.NT_STATUS_ACCOUNT_LOCKED_OUT    // Javadoc 2.1.7 に定義あり
+                NtStatus.NT_STATUS_ACCOUNT_RESTRICTION,
+                NtStatus.NT_STATUS_ACCOUNT_LOCKED_OUT
                 -> throw SmbAuthenticationException("NASへの認証に失敗しました。ユーザー名、パスワード、またはアカウントの状態を確認してください。", e)
 
-                // Host Not Found / Unreachable Errors
-                NtStatus.NT_STATUS_NO_SUCH_DEVICE,         // 0xC000000E (ホスト名間違いの可能性含む)
-                NtStatus.NT_STATUS_CONNECTION_REFUSED      // Javadoc 2.1.7 に定義あり
+                NtStatus.NT_STATUS_NO_SUCH_DEVICE,
+                NtStatus.NT_STATUS_CONNECTION_REFUSED
                 -> throw SmbHostNotFoundException("NASサーバーが見つからないか、到達できません。ホスト名、IPアドレス、ポート、またはプロトコルを確認してください。", e)
 
-                // Share or Path Not Found Errors
                 NtStatus.NT_STATUS_BAD_NETWORK_NAME,
                 NtStatus.NT_STATUS_OBJECT_PATH_NOT_FOUND,
-                NtStatus.NT_STATUS_NO_SUCH_FILE,           // Javadoc 2.1.7 に定義あり
-                NtStatus.NT_STATUS_OBJECT_NAME_NOT_FOUND,  // Javadoc 2.1.7 に定義あり
-                NtStatus.NT_STATUS_OBJECT_NAME_INVALID     // Javadoc 2.1.7 に定義あり (パス形式不正など)
+                NtStatus.NT_STATUS_NO_SUCH_FILE,
+                NtStatus.NT_STATUS_OBJECT_NAME_NOT_FOUND,
+                NtStatus.NT_STATUS_OBJECT_NAME_INVALID
                 -> throw SmbShareNotFoundException("共有フォルダまたは指定されたパスが見つかりません。", e)
 
-                // Permission Errors
                 NtStatus.NT_STATUS_ACCESS_DENIED
                 -> throw SmbPermissionException("指定されたファイルまたはフォルダへのアクセス権がありません。", e)
 
-                // Specific Network Issues
-                NtStatus.NT_STATUS_PIPE_NOT_AVAILABLE,     // 0xC00000AE
-                NtStatus.NT_STATUS_PIPE_DISCONNECTED,      // 0xC00000B1
-                NtStatus.NT_STATUS_PIPE_BROKEN,            // 0xC00000B0
-                NtStatus.NT_STATUS_SHARING_VIOLATION,      // Javadoc 2.1.7 に定義あり (ファイル使用中など)
+                NtStatus.NT_STATUS_PIPE_NOT_AVAILABLE,
+                NtStatus.NT_STATUS_PIPE_DISCONNECTED,
+                NtStatus.NT_STATUS_PIPE_BROKEN,
+                NtStatus.NT_STATUS_SHARING_VIOLATION
                 -> throw SmbNetworkException("NASとの通信中にネットワークエラーが発生しました。", e)
                 
                 else -> {
@@ -169,30 +156,43 @@ class SmbMediaSource @AssistedInject constructor(
             e.printStackTrace()
             throw SmbAccessException("予期せぬエラーが発生しました: ${e.message}", e)
         }
-    }.flowOn(Dispatchers.IO) // Flow全体の処理をIOスレッドで実行
+    }.flowOn(Dispatchers.IO)
+
+    override suspend fun getTrackDetails(trackItem: TrackItem): TrackItem = withContext(Dispatchers.IO) {
+        val smbFile = SmbFile(trackItem.path, authContext)
+        val detailedTrack = parseTrackMetadata(smbFile)
+        return@withContext detailedTrack
+    }
 
     /**
-     * MediaMetadataRetrieverを使ってSMBファイルのメタデータを解析する
+     * MediaMetadataRetrieverを使ってSMBファイルのメタデータを解析する。
+     * @param smbFile メタデータを解析する対象のSmbFile。
+     * @return メタデータが設定されたTrackItem。取得に失敗した場合は部分的な情報のみ。
      */
     private fun parseTrackMetadata(smbFile: SmbFile): TrackItem {
         val fileName = smbFile.name.trimEnd('/')
         val smbUri = smbFile.canonicalPath
+        Log.d("SmbMediaSource", "parseTrackMetadata: 開始 smbUri: $smbUri")
         val retriever = MediaMetadataRetriever()
 
         try {
-            // 1. LocalHttpServerを使って、SMBパスからHTTP URLを生成
+            // LocalHttpServerの起動を保証
+            localHttpServer.ensureStarted()
+            Log.d("SmbMediaSource", "parseTrackMetadata: LocalHttpServer起動確認済み (getStreamingUrl直前)")
+
             val httpUrl = localHttpServer.getStreamingUrl(smbUri, nasConnection.id)
+            Log.d("SmbMediaSource", "parseTrackMetadata: 生成されたhttpUrl: $httpUrl (smbUri: $smbUri)")
 
-            // 2. MediaMetadataRetrieverにHTTP URLと空のヘッダーをセット
-            //    (認証はLocalHttpServerが内部で行うため、ここではヘッダー不要)
+            Log.d("SmbMediaSource", "parseTrackMetadata: MediaMetadataRetrieverにデータソース設定開始 httpUrl: $httpUrl")
             retriever.setDataSource(httpUrl, HashMap<String, String>())
+            Log.d("SmbMediaSource", "parseTrackMetadata: MediaMetadataRetrieverにデータソース設定成功 httpUrl: $httpUrl")
 
-            // 3. 各メタデータを抽出
             val title = retriever.extractMetadata(MediaMetadataRetriever.METADATA_KEY_TITLE)
             val artist = retriever.extractMetadata(MediaMetadataRetriever.METADATA_KEY_ARTIST)
             val album = retriever.extractMetadata(MediaMetadataRetriever.METADATA_KEY_ALBUM)
             val durationStr = retriever.extractMetadata(MediaMetadataRetriever.METADATA_KEY_DURATION)
             val durationMs = durationStr?.toLongOrNull() ?: 0L
+            Log.d("SmbMediaSource", "parseTrackMetadata: メタデータ抽出完了 ($smbUri) -> Title: '$title', Artist: '$artist', Album: '$album', Duration: $durationMs ms")
 
             return TrackItem(
                 title = title?.ifBlank { null } ?: fileName.substringBeforeLast('.'),
@@ -202,43 +202,44 @@ class SmbMediaSource @AssistedInject constructor(
                 album = album?.ifBlank { null },
                 durationMs = durationMs,
                 albumId = null,
-                artworkUri = null // アートワークも retriever.embeddedPicture で取得可能
+                artworkUri = null
             )
         } catch (e: Exception) {
-            Log.e("SmbMediaSource", "Failed to retrieve metadata for: ${smbFile.path}", e)
-            // 解析に失敗した場合は、ファイル名だけの情報を返す
+            Log.e("SmbMediaSource", "parseTrackMetadata: メタデータ取得失敗 smbUri: ${smbFile.path}. 例外: ${e.javaClass.simpleName} - ${e.message}", e)
             return TrackItem(
                 title = fileName.substringBeforeLast('.'),
                 path = smbUri, uri = smbUri,
                 artist = null, albumId = null, album = null, artworkUri = null, durationMs = 0L
             )
         } finally {
-            // 4. 必ずリソースを解放する
+            Log.d("SmbMediaSource", "parseTrackMetadata: MediaMetadataRetriever解放処理 smbUri: $smbUri")
             retriever.release()
         }
     }
 
+    /**
+     * NAS接続情報に基づいて、SMB共有へのベースURLを構築する。
+     * @param sharePath NasConnectionで設定された共有パス (例: "music" や "Multimedia/Audio")。
+     * @return 整形されたSMB URL (例: "smb://hostname/music/")。
+     */
     private fun buildSmbUrl(sharePath: String): String {
-        // sharePath (nasConnection.pathから渡される) を正規化:
-        // 先頭/末尾のスラッシュを除去し、内部の連続するスラッシュを1つにまとめる
         val normalizedPathPart = sharePath
-            .trim('/')                         // 例: "myshare/sub" や "myshare"
-            .replace(Regex("/{2,}"), "/")      // 例: "myshare/sub" や "myshare"
+            .trim('/')
+            .replace(Regex("/{2,}"), "/")
 
         var smbUrl = "smb://${nasConnection.hostname}"
-
-        // 正規化されたパス部分が空でなければ、ホスト名に続けて追加
         if (normalizedPathPart.isNotEmpty()) {
-            smbUrl += "/$normalizedPathPart"  // 例: "smb://server/myshare/sub" または "smb://server/myshare"
+            smbUrl += "/$normalizedPathPart"
         }
-
-        // URLが必ず末尾スラッシュで終わるようにする
         if (!smbUrl.endsWith("/")) {
-            smbUrl += "/"                     // 例: "smb://server/myshare/sub/" または "smb://server/myshare/"
+            smbUrl += "/"
         }
         return smbUrl
     }
 
+    /**
+     * SmbMediaSourceを生成するためのAssistedFactory。
+     */
     @dagger.assisted.AssistedFactory
     interface Factory {
         fun create(nasConnection: NasConnection): SmbMediaSource

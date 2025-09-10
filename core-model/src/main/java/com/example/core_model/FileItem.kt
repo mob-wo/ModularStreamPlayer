@@ -19,11 +19,12 @@ data class FolderItem(
 @Parcelize
 data class TrackItem(
     override val title: String,
-    override val path: String,
+    override val path: String, // equals/hashCodeはデフォルトの動作に任せる
     override val uri: String,
     val artist: String?,
-    val albumId: Long?, // これは後で使う
+    val albumId: Long?,
     val album: String?,
-    val artworkUri: String?, // Coilで読み込む用のアートワークURI
+    val artworkUri: String?,
     val durationMs: Long
 ) : FileItem, Parcelable
+// equals と hashCode のオーバーライドを削除

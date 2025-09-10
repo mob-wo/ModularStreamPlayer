@@ -125,4 +125,13 @@ class LocalMediaSource @Inject constructor(
 
         // itemsリストを返す代わりに、emitで各アイテムを発行したので、ここでのreturnは不要
     }.flowOn(Dispatchers.IO) // このFlowの処理(ContentResolverクエリなど)をIOスレッドで実行
+
+    /**
+     * LocalMediaSourceでは、getItemsInの時点で既に全詳細情報が取得済み。
+     * そのため、この関数は渡されたアイテムをそのまま返すだけで良い。
+     */
+    override suspend fun getTrackDetails(trackItem: TrackItem): TrackItem {
+        // 何もする必要がないので、引数をそのまま返す
+        return trackItem
+    }
 }

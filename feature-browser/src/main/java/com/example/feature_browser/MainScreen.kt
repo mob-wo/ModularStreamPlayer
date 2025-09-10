@@ -115,7 +115,7 @@ fun MainScreen(
                 BrowserScreen(
                     modifier = Modifier.weight(1f),
                     uiState = uiState,
-                    loadItems = { viewModel.loadItemsForCurrentPath() },
+                    // loadItems = { viewModel.loadItemsForCurrentPath() }, // ViewModel内で初期読み込みを行うため削除
                     onItemClick = { item ->
                         when (item) {
                             is TrackItem -> {
@@ -135,7 +135,8 @@ fun MainScreen(
                         if (item is FolderItem) {
                             viewModel.onBrowserEvent(BrowserEvent.OnFolderLongClicked(item))
                         }
-                    }
+                    },
+                    loadMetadataForVisibleItems = viewModel::loadMetadataForVisibleItems // 追加
                 )
 
                 // 2画面モードの時のみミニプレーヤーを表示
@@ -178,7 +179,7 @@ fun MainScreenPreview_GRID_MEDIUM() {
             ) { innerPadding ->
                 Column(modifier = Modifier.padding(innerPadding)) {
                     // ダミーデータでBrowserScreenをプレビュー
-                    BrowserScreenContent(
+                    BrowserScreenContent( // BrowserScreenContentはloadItemsパラメータを持たないため、修正不要
                         modifier = Modifier.weight(1f),
                         uiState = BrowserUiState(
                             currentPath = "/Music",
@@ -187,7 +188,8 @@ fun MainScreenPreview_GRID_MEDIUM() {
                             drawerState = DrawerUiState(layoutMode = LayoutMode.GRID_MEDIUM)
                         ),
                         onItemClick = { },
-                        onItemLongClick = { }
+                        onItemLongClick = { },
+                        loadMetadataForVisibleItems = { Log.d("Preview", "Load metadata for items: $it") } // 追加 (BrowserScreenContentの現在の定義に合わせる)
                     )
                     HorizontalDivider()
                     PlayerScreenContent(
@@ -225,7 +227,7 @@ fun MainScreenPreview_LIST() {
             ) { innerPadding ->
                 Column(modifier = Modifier.padding(innerPadding)) {
                     // ダミーデータでBrowserScreenをプレビュー
-                    BrowserScreenContent(
+                    BrowserScreenContent( // BrowserScreenContentはloadItemsパラメータを持たないため、修正不要
                         modifier = Modifier.weight(1f),
                         uiState = BrowserUiState(
                             currentPath = "/Music",
@@ -234,7 +236,8 @@ fun MainScreenPreview_LIST() {
                             drawerState = DrawerUiState(layoutMode = LayoutMode.LIST)
                         ),
                         onItemClick = { },
-                        onItemLongClick = { }
+                        onItemLongClick = { },
+                        loadMetadataForVisibleItems = { Log.d("Preview", "Load metadata for items: $it") } // 追加 (BrowserScreenContentの現在の定義に合わせる)
                     )
                     HorizontalDivider()
                     PlayerScreenContent(
