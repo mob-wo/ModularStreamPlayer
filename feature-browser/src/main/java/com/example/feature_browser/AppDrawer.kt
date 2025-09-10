@@ -292,7 +292,7 @@ private fun FavoriteItem(
     onLongClick: () -> Unit
 ) {
     // File.separatorを使って、パスの最後の部分（フォルダ名）のみを抽出
-    val folderName = path.substringAfterLast(File.separator)
+    val folderName = path.trimEnd('/').substringAfterLast(File.separator)
     Row(
         modifier = Modifier
             .fillMaxWidth()
